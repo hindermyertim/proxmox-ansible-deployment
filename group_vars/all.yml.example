@@ -36,9 +36,19 @@ containers:
     disk_size: 16
     netif:
       net0: "name=eth0,bridge=vmbr0,ip=dhcp"
-    nesting: 1
+    nesting: 1  # Set to 1 if you plan to run Docker in this container
     unprivileged: true
     password: "CHANGE_ME"  # Change this!
+
+# =============================================================================
+# SOFTWARE INSTALLATION
+# =============================================================================
+# Base tools (always installed)
+install_base_tools: true     # Neovim, git, curl, wget, htop, net-tools
+
+# Docker (optional - default: false)
+install_docker: false        # Set to true to install Docker CE + Docker Compose
+                            # Note: LXC containers need nesting=1 for Docker
 
 # =============================================================================
 # AGENT CONFIGURATION
