@@ -43,8 +43,21 @@ containers:
 # =============================================================================
 # AGENT CONFIGURATION
 # =============================================================================
-install_monitoring: true
-install_qemu_agent: true
+# Standard monitoring
+install_monitoring: true      # Node Exporter (Prometheus)
+install_qemu_agent: true      # QEMU guest agent (Proxmox)
 
-node_exporter_port: 9100
-node_exporter_version: "1.7.0"
+# Homelab agents - set environment variables before running configure_agents.yml
+install_newt: true           # Newt agent for Pangolin reverse proxy
+install_wazuh: true          # Wazuh security monitoring
+install_checkmk: true        # CheckMK analytics
+
+# Agent connection details (set via environment variables):
+# export NEWT_SERVER="https://your-pangolin-server.com"
+# export NEWT_TOKEN="your-token"
+# export NEWT_ACCEPT_CLIENTS=true  # Optional: Enable Olm client connections
+#
+# export WAZUH_MANAGER_IP="your-wazuh-server-ip"
+#
+# export CHECKMK_SERVER="your-checkmk-server"
+# export CHECKMK_SITE="main"

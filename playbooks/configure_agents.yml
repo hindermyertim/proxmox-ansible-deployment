@@ -5,19 +5,37 @@
   vars:
     install_monitoring: true
     install_qemu_agent: true
+    install_newt: true
+    install_wazuh: true
+    install_checkmk: true
+    
+    # Newt (Pangolin) configuration
+    newt_server: "{{ lookup('env', 'NEWT_SERVER') }}"
+    newt_token: "{{ lookup('env', 'NEWT_TOKEN') }}"
+    newt_accept_clients: "{{ lookup('env', 'NEWT_ACCEPT_CLIENTS') | default('false') }}"  # Set to 'true' for Olm client connections
+    
+    # Wazuh configuration
+    wazuh_manager_ip: "{{ lookup('env', 'WAZUH_MANAGER_IP') }}"
+    wazuh_agent_name: "{{ ansible_hostname }}"
+    
+    # CheckMK configuration
+    checkmk_server: "{{ lookup('env', 'CHECKMK_SERVER') }}"
+    checkmk_site: "{{ lookup('env', 'CHECKMK_SITE') | default('main') }}"
+    checkmk_agent_port: 6556
     
   tasks:
+    # ===========================================================================
+    # SYSTEM UPDATES
+    # ===========================================================================
     - name: Update package cache (Debian/Ubuntu)
       apt:
         update_cache: yes
         cache_valid_time: 3600
       when: ansible_os_family == "Debian"
 
-    - name: Update package cache (RedHat)
-      yum:
-        update_cache: yes
-      when: ansible_os_family == "RedHat"
-
+    # ===========================================================================
+    # QEMU GUEST AGENT (for Proxmox VMs)
+    # ===========================================================================
     - name: Install QEMU guest agent
       package:
         name: qemu-guest-agent
@@ -35,7 +53,10 @@
         - install_qemu_agent | bool
         - ansible_virtualization_type == "kvm"
 
-    - name: Install monitoring agent (node_exporter)
+    # ===========================================================================
+    # NODE EXPORTER (Prometheus metrics)
+    # ===========================================================================
+    - name: Install Node Exporter
       block:
         - name: Create node_exporter user
           user:
@@ -90,6 +111,187 @@
             daemon_reload: yes
       when: install_monitoring | bool
 
-    - name: Verify installation
+    # ===========================================================================
+    # NEWT (Pangolin Reverse Proxy Client)
+    # ===========================================================================
+    - name: Install Newt agent for Pangolin
+      block:
+        - name: Download Newt agent
+          get_url:
+            url: https://github.com/pangolin-do-golang/newt/releases/latest/download/newt-linux-amd64
+            dest: /usr/local/bin/newt
+            mode: '0755'
+
+        - name: Create newt config directory
+          file:
+            path: /etc/newt
+            state: directory
+            mode: '0755'
+
+        - name: Configure Newt agent
+          copy:
+            dest: /etc/newt/config.yml
+            content: |
+              server: "{{ newt_server }}"
+              token: "{{ newt_token }}"
+              hostname: "{{ ansible_hostname }}"
+          when: 
+            - newt_server != ""
+            - newt_token != ""
+
+        - name: Create newt systemd service (without --accept-clients)
+          copy:
+            dest: /etc/systemd/system/newt.service
+            content: |
+              [Unit]
+              Description=Newt Agent for Pangolin
+              After=network.target
+
+              [Service]
+              Type=simple
+              ExecStart=/usr/local/bin/newt start --config /etc/newt/config.yml
+              Restart=always
+              RestartSec=10
+
+              [Install]
+              WantedBy=multi-user.target
+          when: 
+            - newt_accept_clients | lower != 'true'
+            - newt_accept_clients | lower != 'yes'
+            - newt_accept_clients != '1'
+
+        - name: Create newt systemd service (with --accept-clients for Olm)
+          copy:
+            dest: /etc/systemd/system/newt.service
+            content: |
+              [Unit]
+              Description=Newt Agent for Pangolin (Olm Client Mode)
+              After=network.target
+
+              [Service]
+              Type=simple
+              ExecStart=/usr/local/bin/newt start --config /etc/newt/config.yml --accept-clients
+              Restart=always
+              RestartSec=10
+
+              [Install]
+              WantedBy=multi-user.target
+          when: 
+            - newt_accept_clients | lower == 'true' or
+              newt_accept_clients | lower == 'yes' or
+              newt_accept_clients == '1'
+
+        - name: Start and enable newt service
+          systemd:
+            name: newt
+            state: started
+            enabled: yes
+            daemon_reload: yes
+          when: 
+            - newt_server != ""
+            - newt_token != ""
+      when: install_newt | bool
+
+    # ===========================================================================
+    # WAZUH AGENT (Security monitoring)
+    # ===========================================================================
+    - name: Install Wazuh Agent
+      block:
+        - name: Install dependencies
+          apt:
+            name:
+              - curl
+              - apt-transport-https
+              - lsb-release
+              - gnupg
+            state: present
+
+        - name: Add Wazuh GPG key
+          apt_key:
+            url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+            state: present
+
+        - name: Add Wazuh repository
+          apt_repository:
+            repo: "deb https://packages.wazuh.com/4.x/apt/ stable main"
+            state: present
+            filename: wazuh
+
+        - name: Install Wazuh agent
+          apt:
+            name: wazuh-agent
+            state: present
+            update_cache: yes
+          environment:
+            WAZUH_MANAGER: "{{ wazuh_manager_ip }}"
+            WAZUH_AGENT_NAME: "{{ wazuh_agent_name }}"
+
+        - name: Start and enable Wazuh agent
+          systemd:
+            name: wazuh-agent
+            state: started
+            enabled: yes
+            daemon_reload: yes
+      when: 
+        - install_wazuh | bool
+        - wazuh_manager_ip != ""
+
+    # ===========================================================================
+    # CHECKMK AGENT (Analytics/Monitoring)
+    # ===========================================================================
+    - name: Install CheckMK Agent
+      block:
+        - name: Install xinetd (required for CheckMK)
+          apt:
+            name: xinetd
+            state: present
+
+        - name: Download CheckMK agent
+          get_url:
+            url: "http://{{ checkmk_server }}/{{ checkmk_site }}/check_mk/agents/check-mk-agent_2.2.0p1-1_all.deb"
+            dest: /tmp/check-mk-agent.deb
+          when: checkmk_server != ""
+
+        - name: Install CheckMK agent
+          apt:
+            deb: /tmp/check-mk-agent.deb
+            state: present
+
+        - name: Configure CheckMK xinetd service
+          copy:
+            dest: /etc/xinetd.d/check-mk-agent
+            content: |
+              service check-mk-agent
+              {
+                  type           = UNLISTED
+                  port           = {{ checkmk_agent_port }}
+                  socket_type    = stream
+                  protocol       = tcp
+                  wait           = no
+                  user           = root
+                  server         = /usr/bin/check_mk_agent
+                  disable        = no
+              }
+
+        - name: Restart xinetd
+          systemd:
+            name: xinetd
+            state: restarted
+            enabled: yes
+      when: 
+        - install_checkmk | bool
+        - checkmk_server != ""
+
+    # ===========================================================================
+    # VERIFICATION
+    # ===========================================================================
+    - name: Display installed agents
       debug:
-        msg: "Agents configured successfully on {{ inventory_hostname }}"
+        msg: |
+          Agents installed on {{ inventory_hostname }}:
+          - QEMU Guest Agent: {{ 'Yes' if install_qemu_agent else 'No' }}
+          - Node Exporter (Prometheus): {{ 'Yes' if install_monitoring else 'No' }}
+          - Newt (Pangolin): {{ 'Yes' if install_newt else 'No' }}{% if newt_accept_clients | lower in ['true', 'yes', '1'] %} [Olm client mode enabled]{% endif %}
+
+          - Wazuh: {{ 'Yes' if install_wazuh else 'No' }}
+          - CheckMK: {{ 'Yes' if install_checkmk else 'No' }}

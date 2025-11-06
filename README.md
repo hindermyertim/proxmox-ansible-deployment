@@ -1,11 +1,16 @@
 # Ansible Proxmox Infrastructure
 
-Automated deployment of VMs and LXC containers to Proxmox with agent configuration.
+Automated deployment of VMs and LXC containers to Proxmox with comprehensive agent configuration.
 
 ## Features
 
 - 🚀 Deploy Debian VMs and LXC containers to Proxmox via API
-- 🔧 Automated agent installation (QEMU guest agent, monitoring)
+- 🔧 Automated agent installation:
+  - QEMU guest agent (Proxmox integration)
+  - Node Exporter (Prometheus metrics)
+  - Newt (Pangolin reverse proxy client)
+  - Wazuh (Security monitoring)
+  - CheckMK (Infrastructure analytics)
 - 📝 Easy configuration via YAML files
 - 🏠 Designed for homelab/small infrastructure
 
@@ -39,9 +44,19 @@ nano inventory/hosts.yml
 ### 3. Set Environment Variables
 
 ```bash
+# Proxmox connection
 export PROXMOX_HOST="your-proxmox-ip"
 export PROXMOX_USER="root@pam"
 export PROXMOX_PASSWORD="your-password"
+
+# Agent configuration (optional - configure agents you use)
+export NEWT_SERVER="https://your-pangolin-server.com"
+export NEWT_TOKEN="your-token"
+export NEWT_ACCEPT_CLIENTS=true  # Optional: Enable Olm client support
+
+export WAZUH_MANAGER_IP="your-wazuh-server"
+export CHECKMK_SERVER="your-checkmk-server"
+export CHECKMK_SITE="main"
 ```
 
 ### 4. Deploy
@@ -100,14 +115,30 @@ containers:
       net0: "name=eth0,bridge=vmbr0,ip=dhcp"
 ```
 
+### Configure Agents
+
+Enable/disable agents in `group_vars/all.yml`:
+
+```yaml
+install_monitoring: true      # Node Exporter
+install_qemu_agent: true      # QEMU guest agent
+install_newt: true           # Pangolin Newt agent
+install_wazuh: true          # Wazuh agent
+install_checkmk: true        # CheckMK agent
+```
+
 ## Installed Agents
 
-The `configure_agents.yml` playbook installs:
+The `configure_agents.yml` playbook can install:
 
-- **QEMU Guest Agent**: For Proxmox VM integration
+- **QEMU Guest Agent**: Proxmox VM integration
 - **Node Exporter**: Prometheus-compatible metrics (port 9100)
+- **Newt**: Pangolin reverse proxy/tunneling client
+  - Supports `--accept-clients` flag for Olm connections
+- **Wazuh Agent**: Security monitoring and threat detection
+- **CheckMK Agent**: Infrastructure analytics (port 6556)
 
-Add more agents by editing `playbooks/configure_agents.yml`.
+Agents are configured via environment variables - only install what you need!
 
 ## Security
 
@@ -117,6 +148,7 @@ Add more agents by editing `playbooks/configure_agents.yml`.
 - Use environment variables for sensitive data
 - Consider using Ansible Vault for encryption
 - Use Proxmox API tokens instead of root password when possible
+- The `.gitignore` is configured to protect your sensitive files
 
 ## Customization
 
@@ -127,13 +159,24 @@ netif:
   net0: "name=eth0,bridge=vmbr0,ip=192.168.1.50/24,gw=192.168.1.1"
 ```
 
-### Add More Agents
+### Selective Agent Installation
 
-Edit `playbooks/configure_agents.yml` to add:
-- Docker
-- Telegraf
-- Custom monitoring
-- Backup agents
+Set environment variables only for agents you want:
+
+```bash
+# Only install Newt and Node Exporter
+export NEWT_SERVER="https://pangolin.example.com"
+export NEWT_TOKEN="token"
+# Don't set WAZUH_MANAGER_IP or CHECKMK_SERVER - they won't install
+```
+
+### Newt with Olm Client Support
+
+Enable Olm client connections:
+
+```bash
+export NEWT_ACCEPT_CLIENTS=true
+```
 
 ## Troubleshooting
 
@@ -163,11 +206,11 @@ Contributions welcome! Please open an issue or PR.
 
 ## License
 
-MIT License - see LICENSE file
+MIT License
 
 ## Acknowledgments
 
 - Built with [Ansible](https://www.ansible.com/)
 - Uses [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) collection
 - Designed for [Proxmox VE](https://www.proxmox.com/)
-# proxmox-ansible-deployment
+- Supports [Pangolin](https://docs.pangolin.net/), Wazuh, and CheckMK agents
