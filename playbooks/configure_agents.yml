@@ -8,11 +8,12 @@
     install_newt: true
     install_wazuh: true
     install_checkmk: true
+    install_base_tools: true    # Install neovim and essential tools
     
     # Newt (Pangolin) configuration
     newt_server: "{{ lookup('env', 'NEWT_SERVER') }}"
     newt_token: "{{ lookup('env', 'NEWT_TOKEN') }}"
-    newt_accept_clients: "{{ lookup('env', 'NEWT_ACCEPT_CLIENTS') | default('false') }}"  # Set to 'true' for Olm client connections
+    newt_accept_clients: "{{ lookup('env', 'NEWT_ACCEPT_CLIENTS') | default('false') }}"
     
     # Wazuh configuration
     wazuh_manager_ip: "{{ lookup('env', 'WAZUH_MANAGER_IP') }}"
@@ -32,6 +33,32 @@
         update_cache: yes
         cache_valid_time: 3600
       when: ansible_os_family == "Debian"
+
+    # ===========================================================================
+    # BASE TOOLS (neovim, git, curl, etc.)
+    # ===========================================================================
+    - name: Install base tools
+      apt:
+        name:
+          - neovim
+          - git
+          - curl
+          - wget
+          - htop
+          - net-tools
+          - vim-tiny
+        state: present
+      when: 
+        - install_base_tools | bool
+        - ansible_os_family == "Debian"
+
+    - name: Set neovim as default editor
+      alternatives:
+        name: editor
+        path: /usr/bin/nvim
+      when: 
+        - install_base_tools | bool
+        - ansible_os_family == "Debian"
 
     # ===========================================================================
     # QEMU GUEST AGENT (for Proxmox VMs)
@@ -285,13 +312,19 @@
     # ===========================================================================
     # VERIFICATION
     # ===========================================================================
-    - name: Display installed agents
+    - name: Display installed agents and tools
       debug:
         msg: |
-          Agents installed on {{ inventory_hostname }}:
+          Installed on {{ inventory_hostname }}:
+          
+          Base Tools:
+          - Neovim: {{ 'Yes' if install_base_tools else 'No' }}
+          - Git, curl, wget, htop: {{ 'Yes' if install_base_tools else 'No' }}
+          
+          Agents:
           - QEMU Guest Agent: {{ 'Yes' if install_qemu_agent else 'No' }}
           - Node Exporter (Prometheus): {{ 'Yes' if install_monitoring else 'No' }}
-          - Newt (Pangolin): {{ 'Yes' if install_newt else 'No' }}{% if newt_accept_clients | lower in ['true', 'yes', '1'] %} [Olm client mode enabled]{% endif %}
+          - Newt (Pangolin): {{ 'Yes' if install_newt else 'No' }}{% if newt_accept_clients | lower in ['true', 'yes', '1'] %} [Olm client mode]{% endif %}
 
           - Wazuh: {{ 'Yes' if install_wazuh else 'No' }}
           - CheckMK: {{ 'Yes' if install_checkmk else 'No' }}
