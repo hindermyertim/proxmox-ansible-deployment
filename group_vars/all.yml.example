@@ -1,0 +1,50 @@
+---
+# =============================================================================
+# PROXMOX CONNECTION
+# =============================================================================
+# Copy this file to all.yml and customize for your environment
+# Set these as environment variables before running playbooks:
+# export PROXMOX_HOST="YOUR_PROXMOX_IP"
+# export PROXMOX_USER="root@pam"
+# export PROXMOX_PASSWORD="your-password"
+
+proxmox_node: "pve"  # Change to your Proxmox node name
+
+# =============================================================================
+# VM DEFINITIONS (Debian-based)
+# =============================================================================
+vms:
+  - name: debian-vm-01
+    vmid: 101
+    cores: 2
+    memory: 2048
+    disk_size: 32
+    iso: "local:iso/debian-12.5.0-amd64-netinst.iso"
+    ostype: l26
+    storage: local-lvm
+
+# =============================================================================
+# LXC CONTAINER DEFINITIONS (Debian-based)
+# =============================================================================
+containers:
+  - hostname: debian-lxc-01
+    vmid: 201
+    template: "local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst"
+    cores: 2
+    memory: 2048
+    swap: 512
+    disk_size: 16
+    netif:
+      net0: "name=eth0,bridge=vmbr0,ip=dhcp"
+    nesting: 1
+    unprivileged: true
+    password: "CHANGE_ME"  # Change this!
+
+# =============================================================================
+# AGENT CONFIGURATION
+# =============================================================================
+install_monitoring: true
+install_qemu_agent: true
+
+node_exporter_port: 9100
+node_exporter_version: "1.7.0"

@@ -1,0 +1,45 @@
+# Ansible
+*.retry
+*.log
+.ansible/
+ansible.log
+
+# Fact caching
+/tmp/ansible_facts/
+
+# Vault files (be careful with secrets!)
+*vault*.yml
+!*vault*.yml.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# === SENSITIVE FILES - DO NOT COMMIT ===
+# Contains your actual IPs, passwords, and infrastructure details
+group_vars/all.yml
+inventory/hosts.yml
+setup-env.sh
+HOMELAB-GUIDE.md
+
+# Keep the example files to show structure
+!group_vars/all.yml.example
+!inventory/hosts.yml.example
+!setup-env.sh.example
+!HOMELAB-GUIDE.md.example

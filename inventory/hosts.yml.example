@@ -1,0 +1,33 @@
+---
+all:
+  children:
+    # Proxmox host (for management)
+    proxmox:
+      hosts:
+        proxmox-host:
+          ansible_host: YOUR_PROXMOX_IP
+          ansible_user: root
+    
+    # Deployed VMs (update with actual IPs after deployment)
+    vms:
+      hosts:
+        # debian-vm-01:
+        #   ansible_host: YOUR_VM_IP
+        #   ansible_user: root
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+    
+    # Deployed LXC containers (update with actual IPs after deployment)
+    containers:
+      hosts:
+        # debian-lxc-01:
+        #   ansible_host: YOUR_CONTAINER_IP
+        #   ansible_user: root
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    # All deployed systems (for agent configuration)
+    agents:
+      children:
+        - vms
+        - containers

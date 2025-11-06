@@ -1,0 +1,42 @@
+---
+- name: Deploy LXC Containers to Proxmox
+  hosts: localhost
+  gather_facts: false
+  vars:
+    proxmox_api_host: "{{ lookup('env', 'PROXMOX_HOST') }}"
+    proxmox_api_user: "{{ lookup('env', 'PROXMOX_USER') }}"
+    proxmox_api_password: "{{ lookup('env', 'PROXMOX_PASSWORD') }}"
+    proxmox_node: "pve"
+    
+  tasks:
+    - name: Create LXC container
+      community.general.proxmox:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ item.vmid }}"
+        hostname: "{{ item.hostname }}"
+        ostemplate: "{{ item.template }}"
+        cores: "{{ item.cores | default(2) }}"
+        memory: "{{ item.memory | default(1024) }}"
+        swap: "{{ item.swap | default(512) }}"
+        disk: "{{ item.storage | default('local-lvm') }}:{{ item.disk_size | default(8) }}"
+        netif: "{{ item.netif | default({'net0': 'name=eth0,bridge=vmbr0,ip=dhcp'}) }}"
+        password: "{{ item.password | default('changeme') }}"
+        unprivileged: "{{ item.unprivileged | default(true) }}"
+        features:
+          - nesting={{ item.nesting | default(1) }}
+        state: present
+      loop: "{{ containers }}"
+      register: lxc_results
+
+    - name: Start containers
+      community.general.proxmox:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ item.vmid }}"
+        state: started
+      loop: "{{ containers }}"

@@ -1,0 +1,43 @@
+---
+- name: Deploy VMs to Proxmox
+  hosts: localhost
+  gather_facts: false
+  vars:
+    proxmox_api_host: "{{ lookup('env', 'PROXMOX_HOST') }}"
+    proxmox_api_user: "{{ lookup('env', 'PROXMOX_USER') }}"
+    proxmox_api_password: "{{ lookup('env', 'PROXMOX_PASSWORD') }}"
+    proxmox_node: "pve"
+    
+  tasks:
+    - name: Create VM
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ item.vmid }}"
+        name: "{{ item.name }}"
+        cores: "{{ item.cores | default(2) }}"
+        memory: "{{ item.memory | default(2048) }}"
+        net:
+          net0: "virtio,bridge=vmbr0"
+        ide:
+          ide2: "{{ item.iso }},media=cdrom"
+        scsihw: virtio-scsi-pci
+        scsi:
+          scsi0: "{{ item.storage | default('local-lvm') }}:{{ item.disk_size | default(32) }}"
+        boot: "order=scsi0;ide2"
+        ostype: "{{ item.ostype | default('l26') }}"
+        state: present
+      loop: "{{ vms }}"
+      register: vm_results
+
+    - name: Start VMs
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ item.vmid }}"
+        state: started
+      loop: "{{ vms }}"
