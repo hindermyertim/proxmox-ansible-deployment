@@ -41,8 +41,8 @@ cp group_vars/all.yml.example group_vars/all.yml
 cp inventory/hosts.yml.example inventory/hosts.yml
 
 # Edit with your Proxmox details
-nano group_vars/all.yml
-nano inventory/hosts.yml
+nvim group_vars/all.yml
+nvim inventory/hosts.yml
 ```
 
 ### 3. Configure What to Install
