@@ -1,6 +1,6 @@
 # Ansible Proxmox Infrastructure
 
-Automated deployment of VMs and LXC containers to Proxmox with comprehensive agent configuration.
+Automated deployment of VMs and LXC containers to Proxmox with comprehensive agent configuration and Dashy dashboard integration.
 
 ## Features
 
@@ -11,6 +11,7 @@ Automated deployment of VMs and LXC containers to Proxmox with comprehensive age
   - Newt (Pangolin reverse proxy client)
   - Wazuh (Security monitoring)
   - CheckMK (Infrastructure analytics)
+- 📊 Dashy dashboard integration - automatically add new services
 - 📝 Easy configuration via YAML files
 - 🏠 Designed for homelab/small infrastructure
 
@@ -21,6 +22,7 @@ Automated deployment of VMs and LXC containers to Proxmox with comprehensive age
 - Proxmox VE server
 - Ansible installed
 - Python 3
+- (Optional) Dashy dashboard for service tracking
 
 ### 2. Setup
 
@@ -49,7 +51,7 @@ export PROXMOX_HOST="your-proxmox-ip"
 export PROXMOX_USER="root@pam"
 export PROXMOX_PASSWORD="your-password"
 
-# Agent configuration (optional - configure agents you use)
+# Agent configuration (optional)
 export NEWT_SERVER="https://your-pangolin-server.com"
 export NEWT_TOKEN="your-token"
 export NEWT_ACCEPT_CLIENTS=true  # Optional: Enable Olm client support
@@ -57,6 +59,9 @@ export NEWT_ACCEPT_CLIENTS=true  # Optional: Enable Olm client support
 export WAZUH_MANAGER_IP="your-wazuh-server"
 export CHECKMK_SERVER="your-checkmk-server"
 export CHECKMK_SITE="main"
+
+# Dashy dashboard (optional)
+export DASHY_HOST="your-dashy-ip"
 ```
 
 ### 4. Deploy
@@ -70,6 +75,11 @@ ansible-playbook playbooks/deploy_lxc.yml
 
 # Configure agents (after VMs/containers are up)
 ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml
+
+# Add service to Dashy dashboard
+export SERVICE_NAME="My Service"
+export SERVICE_URL="https://myservice.local"
+ansible-playbook playbooks/update_dashy.yml
 ```
 
 ## Project Structure
@@ -78,12 +88,15 @@ ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml
 ├── playbooks/
 │   ├── deploy_vms.yml          # VM deployment
 │   ├── deploy_lxc.yml          # LXC deployment
-│   └── configure_agents.yml    # Agent configuration
+│   ├── configure_agents.yml    # Agent configuration
+│   ├── update_dashy.yml        # Update Dashy dashboard
+│   └── deploy_with_dashy.yml   # Deploy + update Dashy
 ├── inventory/
 │   └── hosts.yml               # Infrastructure inventory
 ├── group_vars/
 │   └── all.yml                 # VM/container definitions
-└── ansible.cfg                 # Ansible settings
+├── ansible.cfg                 # Ansible settings
+└── add-to-dashy.sh            # Interactive Dashy update script
 ```
 
 ## Configuration
@@ -139,6 +152,46 @@ The `configure_agents.yml` playbook can install:
 - **CheckMK Agent**: Infrastructure analytics (port 6556)
 
 Agents are configured via environment variables - only install what you need!
+
+## Dashy Dashboard Integration
+
+Automatically add deployed services to your Dashy dashboard:
+
+### Interactive Mode
+
+```bash
+./add-to-dashy.sh
+# Follow the prompts
+```
+
+### Manual Mode
+
+```bash
+export DASHY_HOST="192.168.1.70"
+export SERVICE_NAME="Portainer"
+export SERVICE_URL="https://portainer.local:9443"
+export SERVICE_ICON="hl-portainer"
+export SERVICE_SECTION="Container Management"
+
+ansible-playbook playbooks/update_dashy.yml
+```
+
+### Deploy + Update Dashboard
+
+```bash
+export DEPLOY_TYPE="lxc"
+export DASHY_HOST="192.168.1.70"
+export SERVICE_NAME="My App"
+export SERVICE_URL="https://myapp.local"
+
+ansible-playbook playbooks/deploy_with_dashy.yml
+```
+
+Features:
+- Automatic config backup before changes
+- Creates dashboard sections if they don't exist
+- Supports FontAwesome, Homelab icons, emoji, and custom URLs
+- Restarts Dashy container automatically
 
 ## Security
 
@@ -213,4 +266,4 @@ MIT License
 - Built with [Ansible](https://www.ansible.com/)
 - Uses [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) collection
 - Designed for [Proxmox VE](https://www.proxmox.com/)
-- Supports [Pangolin](https://docs.pangolin.net/), Wazuh, and CheckMK agents
+- Supports [Pangolin](https://docs.pangolin.net/), Wazuh, CheckMK, and [Dashy](https://dashy.to/) integration

@@ -1,0 +1,88 @@
+---
+- name: Update Dashy Dashboard with new services
+  hosts: localhost
+  gather_facts: false
+  vars:
+    dashy_host: "{{ lookup('env', 'DASHY_HOST') }}"           # Dashy server IP/hostname
+    dashy_config_path: "{{ lookup('env', 'DASHY_CONFIG_PATH') | default('/opt/dashy/public/conf.yml') }}"
+    dashy_user: "{{ lookup('env', 'DASHY_USER') | default('root') }}"
+    
+    # Service to add to Dashy
+    service_name: "{{ lookup('env', 'SERVICE_NAME') }}"
+    service_url: "{{ lookup('env', 'SERVICE_URL') }}"
+    service_description: "{{ lookup('env', 'SERVICE_DESCRIPTION') | default('') }}"
+    service_icon: "{{ lookup('env', 'SERVICE_ICON') | default('') }}"
+    service_section: "{{ lookup('env', 'SERVICE_SECTION') | default('Homelab Services') }}"
+    
+  tasks:
+    - name: Verify required variables
+      fail:
+        msg: "Missing required environment variables. Set DASHY_HOST, SERVICE_NAME, and SERVICE_URL"
+      when: 
+        - dashy_host == "" or service_name == "" or service_url == ""
+
+    - name: Backup current Dashy config
+      delegate_to: "{{ dashy_host }}"
+      copy:
+        src: "{{ dashy_config_path }}"
+        dest: "{{ dashy_config_path }}.backup-{{ ansible_date_time.iso8601_basic_short }}"
+        remote_src: yes
+      become: yes
+      become_user: "{{ dashy_user }}"
+
+    - name: Read current Dashy config
+      delegate_to: "{{ dashy_host }}"
+      slurp:
+        src: "{{ dashy_config_path }}"
+      register: dashy_config_content
+      become: yes
+      become_user: "{{ dashy_user }}"
+
+    - name: Parse Dashy config
+      set_fact:
+        dashy_config: "{{ dashy_config_content.content | b64decode | from_yaml }}"
+
+    - name: Create section if it doesn't exist
+      set_fact:
+        dashy_config: "{{ dashy_config | combine({'sections': dashy_config.sections | default([]) + [{'name': service_section, 'items': []}]}, recursive=True) }}"
+      when: dashy_config.sections | default([]) | selectattr('name', 'equalto', service_section) | list | length == 0
+
+    - name: Add new service to section
+      set_fact:
+        updated_sections: "{{ dashy_config.sections | map('combine', {'items': item.items + [new_service]}) if item.name == service_section else item }}"
+      vars:
+        new_service:
+          title: "{{ service_name }}"
+          url: "{{ service_url }}"
+          description: "{{ service_description if service_description != '' else omit }}"
+          icon: "{{ service_icon if service_icon != '' else omit }}"
+      loop: "{{ dashy_config.sections }}"
+
+    - name: Update config with new service
+      set_fact:
+        dashy_config: "{{ dashy_config | combine({'sections': updated_sections}) }}"
+
+    - name: Write updated Dashy config
+      delegate_to: "{{ dashy_host }}"
+      copy:
+        content: "{{ dashy_config | to_nice_yaml(indent=2) }}"
+        dest: "{{ dashy_config_path }}"
+      become: yes
+      become_user: "{{ dashy_user }}"
+
+    - name: Restart Dashy (Docker)
+      delegate_to: "{{ dashy_host }}"
+      docker_container:
+        name: dashy
+        state: restarted
+      become: yes
+      ignore_errors: yes
+      when: lookup('env', 'DASHY_DOCKER') | default('true') | bool
+
+    - name: Display success message
+      debug:
+        msg: |
+          ✓ Successfully added {{ service_name }} to Dashy dashboard
+          Section: {{ service_section }}
+          URL: {{ service_url }}
+          Config backup: {{ dashy_config_path }}.backup-{{ ansible_date_time.iso8601_basic_short }}

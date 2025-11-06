@@ -1,0 +1,24 @@
+---
+- name: Deploy service and update Dashy dashboard
+  hosts: localhost
+  gather_facts: false
+  
+  tasks:
+    - name: Deploy VM
+      import_playbook: deploy_vms.yml
+      when: lookup('env', 'DEPLOY_TYPE') == 'vm'
+
+    - name: Deploy LXC Container
+      import_playbook: deploy_lxc.yml
+      when: lookup('env', 'DEPLOY_TYPE') == 'lxc'
+
+    - name: Wait for service to be accessible
+      wait_for:
+        host: "{{ lookup('env', 'SERVICE_IP') }}"
+        port: "{{ lookup('env', 'SERVICE_PORT') | default(80) }}"
+        timeout: 300
+      when: lookup('env', 'SERVICE_IP') != ""
+
+    - name: Update Dashy dashboard
+      import_playbook: update_dashy.yml
+      when: lookup('env', 'UPDATE_DASHY') | default('true') | bool
