@@ -41,8 +41,8 @@ cp group_vars/all.yml.example group_vars/all.yml
 cp inventory/hosts.yml.example inventory/hosts.yml
 
 # Edit with your Proxmox details
-nano group_vars/all.yml
-nano inventory/hosts.yml
+nvim group_vars/all.yml
+nvim inventory/hosts.yml
 ```
 
 ### 3. Configure What to Install
@@ -242,5 +242,5 @@ MIT License
 - Built with [Ansible](https://www.ansible.com/)
 - Uses [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) collection
 - Designed for [Proxmox VE](https://www.proxmox.com/)
-- Supports [Pangolin](https://docs.pangolin.net/), Wazuh, CheckMK, and [Dashy](https://dashy.to/) integration
+- Supports [Pangolin](https://pangolin.net/), [Wazuh](https://wazuh.com/), [CheckMK](https://checkmk.com/), and [Dashy](https://dashy.to/) integration
 - Docker from official [Docker repository](https://docs.docker.com/)
