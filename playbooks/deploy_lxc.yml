@@ -2,11 +2,12 @@
 - name: Deploy LXC Containers to Proxmox
   hosts: localhost
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
   vars:
     proxmox_api_host: "{{ lookup('env', 'PROXMOX_HOST') }}"
     proxmox_api_user: "{{ lookup('env', 'PROXMOX_USER') }}"
     proxmox_api_password: "{{ lookup('env', 'PROXMOX_PASSWORD') }}"
-    proxmox_node: "pve"
     
   tasks:
     - name: Create LXC container
