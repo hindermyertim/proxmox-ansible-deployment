@@ -15,6 +15,7 @@ Automated deployment of VMs and LXC containers to Proxmox with comprehensive age
   - CheckMK (Infrastructure analytics)
 - 📊 Dashy dashboard integration - automatically add new services
 - 📝 Easy configuration via YAML files
+- 🎨 Enhanced playbook visualization with Moulti
 - 🏠 Designed for homelab/small infrastructure
 
 ## Quick Start
@@ -24,6 +25,7 @@ Automated deployment of VMs and LXC containers to Proxmox with comprehensive age
 - Proxmox VE server
 - Ansible installed
 - Python 3
+- pipx (for Moulti installation)
 - (Optional) Dashy dashboard for service tracking
 
 ### 2. Setup
@@ -33,8 +35,18 @@ Automated deployment of VMs and LXC containers to Proxmox with comprehensive age
 git clone <your-repo>
 cd ansible-infra
 
-# Install required collections
-ansible-galaxy collection install community.general
+# Install Ansible collections
+ansible-galaxy collection install -r requirements.yml
+
+# Install Python dependencies (includes Moulti for enhanced visualization)
+pip install -r requirements.txt
+# Or with pipx for isolation:
+pipx install moulti
+
+# Add pipx bin directory to PATH (if not already)
+export PATH="$HOME/.local/bin:$PATH"
+# Make it permanent by adding to ~/.bashrc:
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
 # Copy example configuration files
 cp group_vars/all.yml.example group_vars/all.yml
@@ -85,20 +97,70 @@ export DASHY_HOST="your-dashy-ip"
 
 ### 5. Deploy
 
+#### Quick Start - Interactive Menu
+
 ```bash
-# Deploy VMs
-ansible-playbook playbooks/deploy_vms.yml
+# Use the interactive menu to choose which playbook to run
+./run-playbook.sh
+```
+
+This will launch an interactive Moulti interface where you can:
+- Choose from available playbooks (VMs, LXC, Configure Agents, Update Dashy)
+- Run a full deployment workflow
+- See real-time progress with enhanced visualization
+
+#### Manual Execution
+
+```bash
+# Deploy VMs (with Moulti for better visualization)
+moulti run ansible-playbook playbooks/deploy_vms.yml
 
 # Deploy LXC containers
-ansible-playbook playbooks/deploy_lxc.yml
+moulti run ansible-playbook playbooks/deploy_lxc.yml
 
 # Configure agents and install software (after VMs/containers are up)
-ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml
+moulti run ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml
 
 # Add service to Dashy dashboard
 export SERVICE_NAME="My Service"
 export SERVICE_URL="https://myservice.local"
-ansible-playbook playbooks/update_dashy.yml
+moulti run ansible-playbook playbooks/update_dashy.yml
+```
+
+**Note:** You can still use standard `ansible-playbook` commands if you prefer. Moulti provides an enhanced TUI that shows each task as a separate step with real-time output, making it easier to track progress and debug issues.
+
+## Moulti - Enhanced Playbook Visualization
+
+Moulti provides a beautiful terminal UI that displays Ansible playbook execution with:
+- ✨ Step-by-step task visualization
+- 📊 Real-time output for each task
+- 🎯 Easy navigation through playbook execution
+- 🔍 Better debugging with organized output
+
+### Usage
+
+Simply prefix your `ansible-playbook` commands with `moulti run`:
+
+```bash
+# Standard command
+ansible-playbook playbooks/deploy_vms.yml
+
+# With Moulti
+moulti run ansible-playbook playbooks/deploy_vms.yml
+```
+
+### Installation Options
+
+```bash
+# Recommended: Install with pipx
+pipx install moulti
+
+# Or install system-wide (not recommended)
+pip install moulti
+
+# Or on Debian/Ubuntu
+apt install pipx
+pipx install moulti
 ```
 
 ## Installed Software & Agents
@@ -146,7 +208,7 @@ export SERVICE_URL="https://portainer.local:9443"
 export SERVICE_ICON="hl-portainer"
 export SERVICE_SECTION="Container Management"
 
-ansible-playbook playbooks/update_dashy.yml
+moulti run ansible-playbook playbooks/update_dashy.yml
 ```
 
 ## Docker Deployment Example
@@ -169,8 +231,8 @@ install_docker: true  # Install Docker
 Then deploy and configure:
 
 ```bash
-ansible-playbook playbooks/deploy_lxc.yml
-ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml
+moulti run ansible-playbook playbooks/deploy_lxc.yml
+moulti run ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml
 ```
 
 SSH in and Docker is ready to use!
@@ -229,6 +291,13 @@ ansible -i inventory/hosts.yml all -m ping
 
 Make sure container has `nesting: 1` enabled in definition!
 
+### Moulti Not Found
+
+Ensure pipx bin directory is in your PATH:
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 ## Contributing
 
 Contributions welcome! Please open an issue or PR.
@@ -242,5 +311,6 @@ MIT License
 - Built with [Ansible](https://www.ansible.com/)
 - Uses [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) collection
 - Designed for [Proxmox VE](https://www.proxmox.com/)
+- Enhanced visualization with [Moulti](https://github.com/xavierog/moulti)
 - Supports [Pangolin](https://pangolin.net/), [Wazuh](https://wazuh.com/), [CheckMK](https://checkmk.com/), and [Dashy](https://dashy.to/) integration
 - Docker from official [Docker repository](https://docs.docker.com/)
