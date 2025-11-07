@@ -102,6 +102,9 @@ export DASHY_HOST="your-dashy-ip"
 ```bash
 # Use the interactive menu to choose which playbook to run
 ./run-playbook.sh
+
+# Or run in dry-run mode to see what would happen without making changes
+./run-playbook.sh --check
 ```
 
 This will launch an interactive Moulti interface where you can:
