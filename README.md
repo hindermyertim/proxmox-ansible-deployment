@@ -57,7 +57,44 @@ nvim group_vars/all.yml
 nvim inventory/hosts.yml
 ```
 
-### 3. Configure What to Install
+
+### 3. Add Containers or VMs
+
+You have two options for adding new containers:
+
+#### Option A: Interactive Helper (Recommended)
+
+Use the helper script to generate container configurations:
+
+```bash
+./add-container.sh
+```
+
+This will:
+- Prompt you for container specifications (hostname, cores, memory, disk, etc.)
+- Generate the YAML configuration
+- Optionally deploy immediately
+
+#### Option B: Manual Configuration
+
+Edit `group_vars/all.yml` directly and add your container under the `containers:` section:
+
+```yaml
+containers:
+  - hostname: nextcloud
+    vmid: 202
+    template: "local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst"
+    cores: 4
+    memory: 4096
+    swap: 512
+    disk_size: 50
+    netif:
+      net0: "name=eth0,bridge=vmbr0,ip=dhcp"
+    nesting: 1        # Set to 1 for Docker support
+    unprivileged: true
+    password: "changeme123"
+```
+### 4. Configure What to Install
 
 Edit `group_vars/all.yml`:
 
@@ -74,7 +111,7 @@ install_wazuh: true         # Wazuh
 install_checkmk: true       # CheckMK
 ```
 
-### 4. Set Environment Variables
+### 5. Set Environment Variables
 
 ```bash
 # Proxmox connection
@@ -95,7 +132,7 @@ export CHECKMK_SITE="main"
 export DASHY_HOST="your-dashy-ip"
 ```
 
-### 5. Deploy
+### 6. Deploy
 
 #### Quick Start - Interactive Menu
 
