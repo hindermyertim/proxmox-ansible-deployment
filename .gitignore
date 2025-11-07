@@ -43,3 +43,6 @@ HOMELAB-GUIDE.md
 !inventory/hosts.yml.example
 !setup-env.sh.example
 !HOMELAB-GUIDE.md.example
+
+# Moulti state directories
+default-*/
