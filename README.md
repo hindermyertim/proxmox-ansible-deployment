@@ -147,9 +147,13 @@ export DASHY_HOST="your-dashy-ip"
 ./run-playbook.sh --check
 ```
 
+
 This will launch an interactive Moulti interface where you can:
-- Choose from available playbooks (VMs, LXC, Configure Agents, Update Dashy)
-- Run a full deployment workflow
+- Choose from:
+  - Deploy VMs (standalone or with agent configuration)
+  - Deploy LXC Containers (standalone or with agent configuration)
+  - Configure Agents on existing systems
+  - Update Dashy Dashboard
 - See real-time progress with enhanced visualization
 
 #### Manual Execution
