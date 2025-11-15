@@ -1,2 +1,6 @@
 # Python dependencies for enhanced playbook visualization
 moulti>=1.34.0
+
+# Proxmox API client library (required for Proxmox modules)
+proxmoxer>=2.0.0
+requests>=2.32.0

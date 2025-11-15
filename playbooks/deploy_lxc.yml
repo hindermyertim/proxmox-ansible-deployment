@@ -41,3 +41,22 @@
         vmid: "{{ item.vmid }}"
         state: started
       loop: "{{ containers }}"
+
+    - name: Wait for containers to be accessible
+      ansible.builtin.wait_for:
+        host: "{{ item.ip }}"
+        port: 22
+        timeout: 300
+      loop: "{{ containers }}"
+      when: item.ip is defined
+
+    - name: Configure console autologin
+      ansible.builtin.shell: |
+        ssh root@{{ item.ip }} "mkdir -p /etc/systemd/system/console-getty.service.d && cat > /etc/systemd/system/console-getty.service.d/override.conf << 'EOFINNER'
+        [Service]
+        ExecStart=
+        ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud console 115200,38400,9600 \$TERM
+        EOFINNER
+        systemctl daemon-reload && systemctl restart console-getty"
+      loop: "{{ containers }}"
+      when: item.ip is defined

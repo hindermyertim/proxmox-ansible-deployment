@@ -1,6 +1,6 @@
 ---
 - name: Configure agents on deployed systems
-  hosts: all
+  hosts: agents
   become: true
   vars:
     install_monitoring: true
@@ -145,6 +145,7 @@
         state: started
         enabled: yes
       when: 
+        - ansible_virtualization_role != "host"
         - install_qemu_agent | bool
         - ansible_virtualization_type == "kvm"
 
@@ -213,7 +214,7 @@
       block:
         - name: Download Newt agent
           get_url:
-            url: https://github.com/pangolin-do-golang/newt/releases/latest/download/newt-linux-amd64
+            url: https://github.com/fosrl/newt/releases/latest/download/newt_linux_amd64
             dest: /usr/local/bin/newt
             mode: '0755'
 

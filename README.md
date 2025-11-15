@@ -38,6 +38,9 @@ cd ansible-infra
 # Install Ansible collections
 ansible-galaxy collection install -r requirements.yml
 
+
+# On Debian/Ubuntu, if pip is externally managed, use apt instead:
+sudo apt-get install python3-proxmoxer python3-requests
 # Install Python dependencies (includes Moulti for enhanced visualization)
 pip install -r requirements.txt
 # Or with pipx for isolation:

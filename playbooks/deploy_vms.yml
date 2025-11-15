@@ -42,3 +42,22 @@
         vmid: "{{ item.vmid }}"
         state: started
       loop: "{{ vms }}"
+
+    - name: Wait for VMs to be accessible
+      ansible.builtin.wait_for:
+        host: "{{ item.ip }}"
+        port: 22
+        timeout: 300
+      loop: "{{ vms }}"
+      when: item.ip is defined
+
+    - name: Configure console autologin for VMs
+      ansible.builtin.shell: |
+        ssh root@{{ item.ip }} "mkdir -p /etc/systemd/system/getty@tty1.service.d && cat > /etc/systemd/system/getty@tty1.service.d/override.conf << 'EOFINNER'
+        [Service]
+        ExecStart=
+        ExecStart=-/sbin/agetty --autologin root --noclear %I \$TERM
+        EOFINNER
+        systemctl daemon-reload && systemctl restart getty@tty1"
+      loop: "{{ vms }}"
+      when: item.ip is defined
