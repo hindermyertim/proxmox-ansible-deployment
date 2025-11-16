@@ -5,6 +5,7 @@
   vars:
     install_monitoring: true
     install_qemu_agent: true
+    install_olm: true
     install_newt: true
     install_wazuh: true
     install_checkmk: true
@@ -12,9 +13,13 @@
     install_docker: false       # Install Docker and Docker Compose (default: false)
     
     # Newt (Pangolin) configuration
+    
+    # Olm (Pangolin mesh) configuration
+    olm_endpoint: "{{ lookup('env', 'NEWT_ENDPOINT') }}"
+    olm_id: ""
+    olm_secret: ""
     newt_server: "{{ lookup('env', 'NEWT_SERVER') }}"
     newt_token: "{{ lookup('env', 'NEWT_TOKEN') }}"
-    newt_accept_clients: "{{ lookup('env', 'NEWT_ACCEPT_CLIENTS') | default('false') }}"
     
     # Wazuh configuration
     wazuh_manager_ip: "{{ lookup('env', 'WAZUH_MANAGER_IP') }}"
@@ -224,65 +229,78 @@
             state: directory
             mode: '0755'
 
-        - name: Configure Newt agent
-          copy:
-            dest: /etc/newt/config.yml
-            content: |
-              endpoint: "{{ newt_endpoint }}"
-              id: "{{ newt_id }}"
-              secret: "{{ newt_secret }}"
-
-          when:
-            - newt_endpoint is defined and newt_endpoint != ""
-            - newt_id is defined and newt_id != ""
-            - newt_secret is defined and newt_secret != ""
-        - name: Create newt systemd service (without --accept-clients)
+        - name: Create newt systemd service
           copy:
             dest: /etc/systemd/system/newt.service
             content: |
               [Unit]
-              Description=Newt Agent for Pangolin
+              Description=Newt
               After=network.target
 
               [Service]
-              Type=simple
-              ExecStart=/usr/local/bin/newt start --config /etc/newt/config.yml
+              ExecStart=/usr/local/bin/newt --id {{ newt_id }} --secret {{ newt_secret }} --endpoint {{ newt_endpoint }} --accept-clients
               Restart=always
-              RestartSec=10
+              User=root
 
               [Install]
               WantedBy=multi-user.target
-          when: 
-            - newt_accept_clients | lower != 'true'
-            - newt_accept_clients | lower != 'yes'
-            - newt_accept_clients != '1'
-
-        - name: Create newt systemd service (with --accept-clients for Olm)
-          copy:
-            dest: /etc/systemd/system/newt.service
-            content: |
-              [Unit]
-              Description=Newt Agent for Pangolin (Olm Client Mode)
-              After=network.target
-
-              [Service]
-              Type=simple
-              ExecStart=/usr/local/bin/newt start --config /etc/newt/config.yml --accept-clients
-              Restart=always
-              RestartSec=10
-
-              [Install]
-              WantedBy=multi-user.target
-          when: 
-            - newt_accept_clients | lower == 'true' or
-              newt_accept_clients | lower == 'yes' or
-              newt_accept_clients == '1'
-
         - name: Start and enable newt service
           systemd:
             name: newt
             state: started
             enabled: yes
+
+    # ===========================================================================
+    # ===========================================================================
+    # ===========================================================================
+    - name: Install Olm client for Pangolin mesh networking
+      block:
+        - name: Download Olm binary
+          get_url:
+            url: "https://github.com/fosrl/olm/releases/download/1.1.5/olm_linux_amd64"
+            dest: /usr/local/bin/olm
+            mode: '0755'
+          when:
+            - olm_endpoint is defined and olm_endpoint != ""
+            - olm_id is defined and olm_id != ""
+            - olm_secret is defined and olm_secret != ""
+
+        - name: Create Olm systemd service
+          template:
+            dest: /etc/systemd/system/olm.service
+            mode: '0644'
+            content: |
+              [Unit]
+              Description=Olm VPN Mesh Client
+              After=network-online.target
+              Wants=network-online.target
+
+              [Service]
+              Type=simple
+              ExecStart=/usr/local/bin/olm --id {{ olm_id }} --secret {{ olm_secret }} --endpoint {{ olm_endpoint }}
+              Restart=always
+              RestartSec=10
+              StandardOutput=journal
+              StandardError=journal
+
+              [Install]
+              WantedBy=multi-user.target
+          when:
+            - olm_endpoint is defined and olm_endpoint != ""
+            - olm_id is defined and olm_id != ""
+            - olm_secret is defined and olm_secret != ""
+
+        - name: Enable and start Olm service
+          systemd:
+            name: olm
+            state: started
+            enabled: yes
+            daemon_reload: yes
+          when:
+            - olm_endpoint is defined and olm_endpoint != ""
+            - olm_id is defined and olm_id != ""
+            - olm_secret is defined and olm_secret != ""
+      when: install_olm | bool
             daemon_reload: yes
           when:
             - newt_endpoint is defined and newt_endpoint != ""
@@ -398,7 +416,6 @@
           Agents:
           - QEMU Guest Agent: {{ 'Yes' if install_qemu_agent else 'No' }}
           - Node Exporter: {{ 'Yes' if install_monitoring else 'No' }}
-          - Newt (Pangolin): {{ 'Yes' if install_newt else 'No' }}{% if newt_accept_clients | lower in ['true', 'yes', '1'] %} [Olm mode]{% endif %}
 
           - Wazuh: {{ 'Yes' if install_wazuh else 'No' }}
           - CheckMK: {{ 'Yes' if install_checkmk else 'No' }}

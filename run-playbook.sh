@@ -69,6 +69,23 @@ prompt_newt_config() {
     else
         NEWT_VARS="-e newt_endpoint='$NEWT_ENDPOINT' -e newt_id='$newt_id' -e newt_secret='$newt_secret'"
         echo "✓ Newt configuration will be applied"
+    
+    # Prompt for Olm credentials
+    echo ""
+    echo "Olm (Pangolin mesh networking) Configuration:"
+    echo "Endpoint: https://pangolin.ass.restaurant"
+    echo ""
+    read -p "Olm ID: " olm_id
+    read -sp "Olm Secret: " olm_secret
+    echo ""
+    
+    if [[ -z "$olm_id" || -z "$olm_secret" ]]; then
+        echo "⊘ Skipping Olm (ID or Secret not provided)"
+        OLM_VARS=""
+    else
+        OLM_VARS="-e olm_endpoint='$NEWT_ENDPOINT' -e olm_id='$olm_id' -e olm_secret='$olm_secret'"
+        echo "✓ Olm configuration will be applied"
+    fi
     fi
     
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -108,14 +125,14 @@ prompt_agent_configs() {
     prompt_checkmk_config
     
     # Combine all extra vars
-    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $CHECKMK_VARS"
+    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $OLM_VARS $CHECKMK_VARS"
 }
     prompt_wazuh_config
     prompt_newt_config
     prompt_checkmk_config
     
     # Combine all extra vars
-    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $CHECKMK_VARS"
+    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $OLM_VARS $CHECKMK_VARS"
 }
 
 # Parse command line arguments

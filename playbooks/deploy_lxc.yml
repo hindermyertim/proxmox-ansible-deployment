@@ -32,6 +32,30 @@
       loop: "{{ containers }}"
       register: lxc_results
 
+    - name: Configure TUN device support for Olm
+      block:
+        - name: Enable TUN device for containers with Olm
+          shell: |
+            if ! grep -q "lxc.cgroup2.devices.allow: c 10:200 rwm" /etc/pve/lxc/{{ item.vmid }}.conf; then
+              echo 'lxc.cgroup2.devices.allow: c 10:200 rwm' >> /etc/pve/lxc/{{ item.vmid }}.conf
+            fi
+            if ! grep -q "lxc.mount.entry: /dev/net dev/net none bind,create=dir" /etc/pve/lxc/{{ item.vmid }}.conf; then
+              echo 'lxc.mount.entry: /dev/net dev/net none bind,create=dir' >> /etc/pve/lxc/{{ item.vmid }}.conf
+            fi
+          delegate_to: "{{ proxmox_api_host }}"
+          loop: "{{ containers }}"
+          when: item.enable_olm | default(false) | bool
+
+        - name: Restart containers to apply TUN configuration
+          community.general.proxmox:
+            node: "{{ proxmox_node }}"
+            vmid: "{{ item.vmid }}"
+            api_host: "{{ proxmox_api_host }}"
+            api_user: "{{ proxmox_api_user }}"
+            api_password: "{{ proxmox_api_password }}"
+            state: restarted
+          loop: "{{ containers }}"
+          when: item.enable_olm | default(false) | bool
     - name: Start containers
       community.general.proxmox:
         api_host: "{{ proxmox_api_host }}"
