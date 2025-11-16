@@ -52,12 +52,12 @@
 
     - name: Configure console autologin
       ansible.builtin.shell: |
-        ssh root@{{ item.ip }} "mkdir -p /etc/systemd/system/console-getty.service.d && cat > /etc/systemd/system/console-getty.service.d/override.conf << 'EOFINNER'
+        ssh root@{{ item.ip }} "mkdir -p /etc/systemd/system/console-getty.service.d && cat > /etc/systemd/system/container-getty@1.service.d/override.conf << 'EOFINNER'
         [Service]
         ExecStart=
         ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud console 115200,38400,9600 \$TERM
         EOFINNER
-        systemctl daemon-reload && systemctl restart console-getty"
+        systemctl daemon-reload && systemctl restart container-getty@1"
       loop: "{{ containers }}"
       when: item.ip is defined
 
@@ -69,6 +69,9 @@
     - name: Copy local SSH keys to containers
       shell: |
         cat ~/.ssh/id_ed25519.pub | ssh root@{{ proxmox_api_host }} "pct exec {{ item.vmid }} -- bash -c 'cat >> /root/.ssh/authorized_keys'"
+      loop: "{{ containers }}"
+    - name: Enable console autologin (LXC)
+      shell: ssh root@{{ proxmox_api_host }} "pct exec {{ item.vmid }} -- bash -c 'mkdir -p /etc/systemd/system/console-getty.service.d && /bin/echo -e "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear --keep-baud console 115200,38400,9600 \\$TERM" > /etc/systemd/system/container-getty@1.service.d/override.conf && systemctl daemon-reload && systemctl restart container-getty@1'"
       loop: "{{ containers }}"
 
     - name: Wait for containers to get IP addresses
