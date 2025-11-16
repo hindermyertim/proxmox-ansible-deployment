@@ -46,3 +46,4 @@ HOMELAB-GUIDE.md
 
 # Moulti state directories
 default-*/
+/.env

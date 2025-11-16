@@ -47,6 +47,13 @@ pip install -r requirements.txt
 pipx install moulti
 
 # Add pipx bin directory to PATH (if not already)
+
+# Configure environment (Proxmox credentials + agent endpoints)
+# This will prompt for all settings and save them to .env
+source setup-env.sh
+
+# For future sessions, quickly reload saved settings:
+# source .env
 export PATH="$HOME/.local/bin:$PATH"
 # Make it permanent by adding to ~/.bashrc:
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
@@ -183,6 +190,40 @@ Moulti provides a beautiful terminal UI that displays Ansible playbook execution
 - 📊 Real-time output for each task
 - 🎯 Easy navigation through playbook execution
 - 🔍 Better debugging with organized output
+## Agent Configuration
+
+The playbook can automatically configure monitoring and management agents on deployed systems:
+
+### Supported Agents
+
+1. **Wazuh** - Security monitoring and threat detection
+2. **Pangolin/Newt** - Reverse proxy tunneling for remote access
+3. **CheckMK** - Infrastructure monitoring
+
+### Environment Variables
+
+Agent endpoints are configured when you run `setup-env.sh`. You will be prompted for:
+
+- **Proxmox Host** - IP or hostname of your Proxmox server
+- **Proxmox User** - Authentication user (default: root@pam)
+- **Proxmox Password** - Your Proxmox password
+- **Wazuh Manager IP** (optional) - For security monitoring
+- **Pangolin/Newt Endpoint** (optional) - For reverse proxy tunneling
+- **CheckMK Server** (optional) - For infrastructure monitoring
+- **CheckMK Site** (optional) - CheckMK site name (default: main)
+
+All settings are saved to `.env` file for future use.
+
+### Interactive Prompts
+
+When deploying with agent configuration, you will be prompted for:
+
+- **Wazuh Agent Group** (optional) - For organizing agents
+- **Newt ID & Secret** (required) - Credentials from Pangolin site creation
+
+All other settings are read from environment variables. If an environment variable is not set, that agent will be skipped.
+
+
 
 ### Usage
 

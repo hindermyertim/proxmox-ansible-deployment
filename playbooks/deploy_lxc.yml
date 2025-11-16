@@ -60,3 +60,39 @@
         systemctl daemon-reload && systemctl restart console-getty"
       loop: "{{ containers }}"
       when: item.ip is defined
+
+    - name: Copy SSH keys to containers
+      shell: |
+        ssh root@{{ proxmox_api_host }} "cat ~/.ssh/id_ed25519.pub | pct exec {{ item.vmid }} -- bash -c 'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys'"
+      loop: "{{ containers }}"
+
+    - name: Copy local SSH keys to containers
+      shell: |
+        cat ~/.ssh/id_ed25519.pub | ssh root@{{ proxmox_api_host }} "pct exec {{ item.vmid }} -- bash -c 'cat >> /root/.ssh/authorized_keys'"
+      loop: "{{ containers }}"
+
+    - name: Wait for containers to get IP addresses
+      pause:
+        seconds: 10
+
+    - name: Get container IP addresses
+      shell: |
+        ssh root@{{ proxmox_api_host }} "pct exec {{ item.vmid }} -- ip -4 addr show eth0 | grep inet | awk '{print \$2}' | cut -d/ -f1"
+      register: container_ips
+      loop: "{{ containers }}"
+      when: item.netif.net0 is defined
+
+    - name: Update inventory with deployed containers
+      blockinfile:
+        path: "{{ playbook_dir }}/../inventory/hosts.yml"
+        marker: "        # {mark} ANSIBLE MANAGED - LXC CONTAINERS"
+        insertafter: "      hosts:"
+        block: |
+          {% for idx in range(containers | length) %}
+          {% if container_ips.results[idx].stdout is defined %}
+                  {{ containers[idx].hostname }}:
+                    ansible_host: {{ container_ips.results[idx].stdout }}
+                    ansible_user: root
+          {% endif %}
+          {% endfor %}
+      when: container_ips.results | length > 0
