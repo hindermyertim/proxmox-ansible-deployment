@@ -266,7 +266,7 @@
             - olm_secret is defined and olm_secret != ""
 
         - name: Create Olm systemd service
-          template:
+          copy:
             dest: /etc/systemd/system/olm.service
             mode: '0644'
             content: |
@@ -301,12 +301,6 @@
             - olm_id is defined and olm_id != ""
             - olm_secret is defined and olm_secret != ""
       when: install_olm | bool
-            daemon_reload: yes
-          when:
-            - newt_endpoint is defined and newt_endpoint != ""
-            - newt_id is defined and newt_id != ""
-            - newt_secret is defined and newt_secret != ""
-      when: install_newt | bool
 
     # ===========================================================================
     # WAZUH AGENT (Security monitoring)
