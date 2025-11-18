@@ -217,6 +217,8 @@ The playbook can automatically configure monitoring and management agents on dep
 **Container Configuration:**
 
 To enable Olm on a container, add `enable_olm: true` to the container definition in `group_vars/all.yml`:
+**Note:** You must set `enable_olm: true` **before** deploying the container for TUN device configuration to be applied automatically.
+
 
 ```yaml
 containers:
