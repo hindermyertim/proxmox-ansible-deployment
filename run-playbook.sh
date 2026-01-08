@@ -166,11 +166,19 @@ echo ""
 PS3=$'\nEnter your choice (1-6): '
 options=(
     "Deploy VMs"
+    "Deploy VMs + Configure Agents"
     "Deploy LXC Containers"
     "Deploy LXC Containers + Configure Agents"
     "Configure Agents"
     "Update Dashy Dashboard"
     "Exit"
+
+
+
+
+
+
+
 )
 
 select opt in "${options[@]}"
@@ -183,15 +191,24 @@ do
             echo "→ Running: Deploy VMs ${DRY_RUN:+(dry run)}"
             moulti run ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS
             break
+            moulti run bash -c "moulti step add step1 --title="Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}" --classes="standard" && moulti pass -- ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS | moulti pass --step-id=step1 && moulti step add step2 --title="Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}" --classes="standard" && moulti pass -- ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $WAZUH_VARS $NEWT_VARS $CHECKMK_VARS | moulti pass --step-id=step2"
+            
+moulti step add step1 --title='Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}' --classes='standard'
+moulti pass -- ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS | moulti pass --step-id=step1
+
+moulti step add step2 --title='Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}' --classes='standard'
+moulti pass -- ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $WAZUH_VARS $NEWT_VARS $CHECKMK_VARS | moulti pass --step-id=step2
+            
+            break
             ;;
         
-        2)
+        3)
             echo ""
             echo "→ Running: Deploy LXC Containers ${DRY_RUN:+(dry run)}"
             moulti run ansible-playbook playbooks/deploy_lxc.yml $DRY_RUN
             break
             ;;
-        3)
+        4)
             echo ""
             prompt_agent_configs
             echo ""
@@ -214,7 +231,7 @@ moulti step add complete --title='✓ Complete' --text='LXC deployment finished!
 "
             break
             ;;
-        4)
+        5)
             echo ""
             prompt_agent_configs
             echo ""
@@ -222,13 +239,13 @@ moulti step add complete --title='✓ Complete' --text='LXC deployment finished!
             moulti run ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $EXTRA_VARS
             break
             ;;
-        5)
+        6)
             echo ""
             echo "→ Running: Update Dashy Dashboard ${DRY_RUN:+(dry run)}"
             moulti run ansible-playbook playbooks/update_dashy.yml $DRY_RUN
             break
             ;;
-        6)
+        7)
             echo ""
             echo "Goodbye!"
             exit 0
