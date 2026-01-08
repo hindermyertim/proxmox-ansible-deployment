@@ -29,7 +29,8 @@
       shell: ssh root@{{ proxmox_api_host }} "mkdir -p /var/lib/vz/snippets"
     
     - name: Ensure local storage includes snippets content type
-      shell: ssh root@{{ proxmox_api_host }} "grep -q 'content.*snippets' /etc/pve/storage.cfg || sed -i '/^dir: local/,/^$/ s/content \(.*\)/content \1,snippets/' /etc/pve/storage.cfg"
+      shell: |
+        ssh root@{{ proxmox_api_host }} "grep -q 'content.*snippets' /etc/pve/storage.cfg || sed -i 's/content iso,vztmpl,backup/content iso,vztmpl,backup,snippets/' /etc/pve/storage.cfg"
     
     - name: Write SSH keys to temp file locally
       copy:
