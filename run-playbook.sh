@@ -200,30 +200,18 @@ do
             echo ""
             echo "→ Running: Deploy VMs + Configure Agents ${DRY_RUN:+(dry run)}"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            
-            moulti run bash -c "
-export PATH=\"\$HOME/.local/bin:\$PATH\"
-export ANSIBLE_STDOUT_CALLBACK=moulti
-export ANSIBLE_CALLBACKS_ENABLED=moulti
-
-moulti step add step1 --title='Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}' --classes='standard'
-ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS 2>&1 | moulti pass step1
-
-moulti divider add div1 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-
-moulti step add step2 --title='Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}' --classes='standard'
-ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $EXTRA_VARS 2>&1 | moulti pass step2
-
-moulti divider add div2 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-moulti step add complete --title='✓ Complete' --text='VM deployment finished! ${DRY_RUN:+(dry run - no changes made)}' --classes='success'
-"
-            break
-            ;;
-        
-        3)
             echo ""
-            echo "→ Running: Deploy LXC Containers ${DRY_RUN:+(dry run)}"
-            moulti run ansible-playbook playbooks/deploy_lxc.yml $DRY_RUN
+            echo "Step 1/2: Deploying VM..."
+            moulti run ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS
+            
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Step 2/2: Configuring Agents..."
+            moulti run ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $EXTRA_VARS
+            
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "✓ Complete! VM deployed and agents configured."
             break
             ;;
         4)
@@ -232,15 +220,21 @@ moulti step add complete --title='✓ Complete' --text='VM deployment finished! 
             echo ""
             echo "→ Running: Deploy LXC Containers + Configure Agents ${DRY_RUN:+(dry run)}"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "Step 1/2: Deploying LXC Containers..."
+            moulti run ansible-playbook playbooks/deploy_lxc.yml $DRY_RUN
             
-            moulti run bash -c "
-export PATH=\"\$HOME/.local/bin:\$PATH\"
-export ANSIBLE_STDOUT_CALLBACK=moulti
-export ANSIBLE_CALLBACKS_ENABLED=moulti
-
-
-moulti step add step1 --title='Step 1/2: Deploy LXC Containers ${DRY_RUN:+(dry run)}' --classes='standard'
-ansible-playbook playbooks/deploy_lxc.yml $DRY_RUN 2>&1 | moulti pass step1
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Step 2/2: Configuring Agents..."
+            moulti run ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $EXTRA_VARS
+            
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "✓ Complete! LXC containers deployed and agents configured."
+            break
+            ;;
+        
 
 moulti divider add div1 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
