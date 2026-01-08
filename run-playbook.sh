@@ -203,6 +203,8 @@ do
             
             moulti run bash -c "
 export PATH=\"\$HOME/.local/bin:\$PATH\"
+export ANSIBLE_STDOUT_CALLBACK=moulti
+export ANSIBLE_CALLBACKS_ENABLED=moulti
 
 moulti step add step1 --title='Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}' --classes='standard'
 ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS 2>&1 | moulti pass step1
@@ -233,6 +235,9 @@ moulti step add complete --title='✓ Complete' --text='VM deployment finished! 
             
             moulti run bash -c "
 export PATH=\"\$HOME/.local/bin:\$PATH\"
+export ANSIBLE_STDOUT_CALLBACK=moulti
+export ANSIBLE_CALLBACKS_ENABLED=moulti
+
 
 moulti step add step1 --title='Step 1/2: Deploy LXC Containers ${DRY_RUN:+(dry run)}' --classes='standard'
 ansible-playbook playbooks/deploy_lxc.yml $DRY_RUN 2>&1 | moulti pass step1
