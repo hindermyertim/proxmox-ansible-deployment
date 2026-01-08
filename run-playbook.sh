@@ -163,7 +163,7 @@ echo ""
 echo "Select a playbook to run:"
 echo ""
 
-PS3=$'\nEnter your choice (1-6): '
+PS3=$'\nEnter your choice (1-7): '
 options=(
     "Deploy VMs"
     "Deploy VMs + Configure Agents"
@@ -191,14 +191,30 @@ do
             echo "→ Running: Deploy VMs ${DRY_RUN:+(dry run)}"
             moulti run ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS
             break
-            moulti run bash -c "moulti step add step1 --title="Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}" --classes="standard" && moulti pass -- ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS | moulti pass --step-id=step1 && moulti step add step2 --title="Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}" --classes="standard" && moulti pass -- ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $WAZUH_VARS $NEWT_VARS $CHECKMK_VARS | moulti pass --step-id=step2"
+            ;;
+        
+        2)
+            echo ""
+            prompt_vm_config
+            prompt_agent_configs
+            echo ""
+            echo "→ Running: Deploy VMs + Configure Agents ${DRY_RUN:+(dry run)}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             
+            moulti run bash -c "
+export PATH=\"\$HOME/.local/bin:\$PATH\"
+
 moulti step add step1 --title='Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}' --classes='standard'
-moulti pass -- ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS | moulti pass --step-id=step1
+ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS 2>&1 | moulti pass step1
+
+moulti divider add div1 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
 moulti step add step2 --title='Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}' --classes='standard'
-moulti pass -- ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $WAZUH_VARS $NEWT_VARS $CHECKMK_VARS | moulti pass --step-id=step2
-            
+ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $WAZUH_VARS $NEWT_VARS $CHECKMK_VARS 2>&1 | moulti pass step2
+
+moulti divider add div2 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+moulti step add complete --title='✓ Complete' --text='VM deployment finished! ${DRY_RUN:+(dry run - no changes made)}' --classes='success'
+"
             break
             ;;
         
@@ -251,7 +267,7 @@ moulti step add complete --title='✓ Complete' --text='LXC deployment finished!
             exit 0
             ;;
         *)
-            echo "Invalid option. Please select 1-6."
+            echo "Invalid option. Please select 1-7."
             ;;
     esac
 done
