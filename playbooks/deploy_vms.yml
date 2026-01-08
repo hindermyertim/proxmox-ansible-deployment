@@ -1,5 +1,5 @@
 ---
-- name: Deploy VMs to Proxmox
+- name: Deploy VMs to Proxmox with Cloud-Init
   hosts: localhost
   gather_facts: false
   become: false
@@ -8,36 +8,88 @@
     proxmox_api_user: "{{ lookup('env', 'PROXMOX_USER') }}"
     proxmox_api_password: "{{ lookup('env', 'PROXMOX_PASSWORD') }}"
     proxmox_node: "pve"
-    # VM configuration (can be overridden with -e flags)
     vm_name_input: "{{ vm_name | default('debian-vm-01') }}"
     vm_id_input: "{{ vm_id | default(101) }}"
     vm_cores_input: "{{ vm_cores | default(2) }}"
     vm_memory_input: "{{ vm_memory | default(2048) }}"
     vm_disk_input: "{{ vm_disk | default(32) }}"
-    vm_iso_input: "{{ vm_iso | default('local:iso/debian-13.1.0-amd64-netinst.iso') }}"
     vm_storage_input: "{{ vm_storage | default('local-lvm') }}"
+    cloud_image: "debian-12-genericcloud-amd64.qcow2"
     
   tasks:
-    - name: Create VM
-      community.general.proxmox_kvm:
-        api_host: "{{ proxmox_api_host }}"
-        api_user: "{{ proxmox_api_user }}"
-        api_password: "{{ proxmox_api_password }}"
-        node: "{{ proxmox_node }}"
-        vmid: "{{ vm_id_input }}"
-        name: "{{ vm_name_input }}"
-        cores: "{{ vm_cores_input }}"
-        memory: "{{ vm_memory_input }}"
-        net:
-          net0: "virtio,bridge=vmbr0"
-        ide:
-          ide2: "{{ vm_iso_input }},media=cdrom"
-        scsihw: virtio-scsi-pci
-        scsi:
-          scsi0: "{{ vm_storage_input }}:{{ vm_disk_input }}"
-        boot: "order=scsi0;ide2"
-        ostype: l26
-        state: present
+    - name: Read local SSH public key (for Ansible access)
+      set_fact:
+        local_ssh_key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+    
+    - name: Get Proxmox host SSH public key
+      shell: ssh root@{{ proxmox_api_host }} "cat ~/.ssh/id_ed25519.pub 2>/dev/null || cat ~/.ssh/id_rsa.pub 2>/dev/null || echo ''"
+      register: proxmox_ssh_key_result
+    
+    - name: Write SSH keys to temp file locally
+      copy:
+        content: |
+          {{ local_ssh_key }}
+          {{ proxmox_ssh_key_result.stdout }}
+        dest: "/tmp/vm-{{ vm_id_input }}-sshkeys"
+    
+    - name: Create cloud-init user-data with qemu-guest-agent
+      copy:
+        content: |
+          #cloud-config
+          package_update: true
+          packages:
+            - qemu-guest-agent
+          runcmd:
+            - systemctl enable qemu-guest-agent
+            - systemctl start qemu-guest-agent
+        dest: "/tmp/vm-{{ vm_id_input }}-userdata.yml"
+    
+    - name: Copy files to Proxmox host
+      shell: |
+        scp /tmp/vm-{{ vm_id_input }}-sshkeys root@{{ proxmox_api_host }}:/tmp/
+        scp /tmp/vm-{{ vm_id_input }}-userdata.yml root@{{ proxmox_api_host }}:/var/lib/vz/snippets/vm-{{ vm_id_input }}-userdata.yml
+    
+    - name: Remove local temp files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/vm-{{ vm_id_input }}-sshkeys"
+        - "/tmp/vm-{{ vm_id_input }}-userdata.yml"
+    
+    - name: Create and configure VM with cloud-init
+      shell: |
+        ssh root@{{ proxmox_api_host }} "
+        qm create {{ vm_id_input }} \
+          -name {{ vm_name_input }} \
+          -cores {{ vm_cores_input }} \
+          -memory {{ vm_memory_input }} \
+          -net0 virtio,bridge=vmbr0 \
+          -scsihw virtio-scsi-pci \
+          -agent 1 \
+          -onboot 1 \
+          -ostype l26
+        
+        qm importdisk {{ vm_id_input }} /var/lib/vz/template/iso/{{ cloud_image }} {{ vm_storage_input }} >/dev/null
+        
+        qm set {{ vm_id_input }} \
+          -scsi0 {{ vm_storage_input }}:vm-{{ vm_id_input }}-disk-0 \
+          -boot order=scsi0 \
+          -serial0 socket >/dev/null
+        
+        qm resize {{ vm_id_input }} scsi0 {{ vm_disk_input }}G >/dev/null
+        
+        qm set {{ vm_id_input }} -ide2 {{ vm_storage_input }}:cloudinit >/dev/null
+        
+        qm set {{ vm_id_input }} \
+          -ciuser root \
+          -sshkeys /tmp/vm-{{ vm_id_input }}-sshkeys \
+          -cicustom 'user=local:snippets/vm-{{ vm_id_input }}-userdata.yml' \
+          -ipconfig0 ip=dhcp >/dev/null
+        
+        rm /tmp/vm-{{ vm_id_input }}-sshkeys
+        "
+      register: vm_create
 
     - name: Start VM
       community.general.proxmox_kvm:
@@ -47,4 +99,47 @@
         node: "{{ proxmox_node }}"
         vmid: "{{ vm_id_input }}"
         state: started
-
+    
+    - name: Wait for VM to boot, cloud-init to run, and guest agent to start
+      pause:
+        seconds: 60
+    
+    - name: Get VM IP address
+      shell: ssh root@{{ proxmox_api_host }} "qm guest cmd {{ vm_id_input }} network-get-interfaces 2>/dev/null | grep -oP '(?<=\"ip-address\":\")[0-9.]+' | grep -v '127.0.0.1' | head -1"
+      register: vm_ip
+      retries: 10
+      delay: 10
+      until: vm_ip.stdout != ""
+      failed_when: false
+    
+    - name: Display VM info
+      debug:
+        msg: "VM {{ vm_name_input }} (ID: {{ vm_id_input }}) created{{ ' with IP: ' + vm_ip.stdout if vm_ip.stdout else ' - check Proxmox console for IP' }}"
+    
+    - name: Wait for SSH to be available
+      wait_for:
+        host: "{{ vm_ip.stdout }}"
+        port: 22
+        timeout: 120
+      when: vm_ip.stdout != ""
+    
+    - name: Test SSH access to VM
+      shell: ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@{{ vm_ip.stdout }} "echo 'SSH access successful'"
+      register: ssh_test
+      when: vm_ip.stdout != ""
+    
+    - name: Display SSH test result
+      debug:
+        msg: "✓ {{ ssh_test.stdout }}"
+      when: vm_ip.stdout != "" and ssh_test.rc == 0
+    
+    - name: Add VM to inventory
+      blockinfile:
+        path: "{{ playbook_dir }}/../inventory/hosts.yml"
+        insertafter: "^      hosts:"
+        marker: "          # {mark} ANSIBLE MANAGED BLOCK {{ vm_name_input }}"
+        block: |2
+                    {{ vm_name_input }}:
+                     ansible_host: {{ vm_ip.stdout }}
+                     ansible_user: root
+      when: vm_ip.stdout != ""

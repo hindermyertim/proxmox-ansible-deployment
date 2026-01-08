@@ -111,24 +111,33 @@ containers:
 
 #### For VMs
 
-**VMs are now configured interactively during deployment!**
+**VMs are now fully automated with cloud-init!**
 
-When you run `./run-playbook.sh` and select "Deploy VMs" (option 1), you'll be prompted to enter:
-- VM Name (e.g., debian-vm-02)
-- VM ID (e.g., 102)
+VMs are deployed using Debian 12 cloud images with automatic SSH key injection and guest agent installation. When you run `./run-playbook.sh` and select "Deploy VMs" (option 1), you'll be prompted to enter:
+- VM Name (e.g., webserver-01)
+- VM ID (e.g., 108) 
 - CPU Cores (default: 2)
 - Memory in MB (default: 2048)
 - Disk size in GB (default: 32)
 
-The VM will be created with these specifications automatically. No need to edit YAML files!
+The playbook will automatically:
+1. ✅ Create the VM with the specified resources
+2. ✅ Import and resize the Debian 12 cloud image disk
+3. ✅ Inject SSH keys from both this control node AND the Proxmox host
+4. ✅ Install qemu-guest-agent via cloud-init for IP detection
+5. ✅ Start the VM and wait for it to boot
+6. ✅ Detect the VM's IP address automatically
+7. ✅ Test SSH connectivity
+8. ✅ Add the VM to inventory automatically
 
-> **Note**: The default Debian ISO used is `debian-13.1.0-amd64-netinst.iso`. Make sure this ISO is uploaded to your Proxmox server under the `local` storage.
+**No manual OS installation required!** The VM is ready to use immediately.
 
-**Post-Deployment Steps:**
-1. The VM will be created and started with the ISO mounted
-2. Access the VM console through Proxmox UI to install the operating system
-3. After OS installation, manually add the VM to `inventory/hosts.yml` under the `vms` section
-4. Run option 4 (Configure Agents) from the menu to install monitoring agents
+> **Note**: The Debian 12 cloud image (`debian-12-genericcloud-amd64.qcow2`) must be downloaded to your Proxmox server. The deployment will guide you through this if needed.
+
+**Post-Deployment:**
+- VMs are automatically added to inventory with their detected IP
+- Run option 4 (Configure Agents) from the menu to install monitoring agents (Wazuh, CheckMK, Newt)
+- SSH access works immediately without manual key setup
 
 ### 4. Configure What to Install
 
