@@ -9,6 +9,35 @@ if ! command -v moulti &> /dev/null; then
     exit 1
 fi
 
+# Function to prompt for VM configuration
+prompt_vm_config() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "VM Configuration"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    read -p "VM Name (e.g., debian-vm-02): " vm_name
+    read -p "VM ID (e.g., 102): " vm_id
+    read -p "CPU Cores (default: 2): " vm_cores
+    vm_cores=${vm_cores:-2}
+    read -p "Memory in MB (default: 2048): " vm_memory
+    vm_memory=${vm_memory:-2048}
+    read -p "Disk size in GB (default: 32): " vm_disk
+    vm_disk=${vm_disk:-32}
+    
+    VM_VARS="-e vm_name=$vm_name -e vm_id=$vm_id -e vm_cores=$vm_cores -e vm_memory=$vm_memory -e vm_disk=$vm_disk"
+    
+    echo ""
+    echo "✓ VM Configuration:"
+    echo "  Name: $vm_name"
+    echo "  ID: $vm_id"
+    echo "  Cores: $vm_cores"
+    echo "  Memory: ${vm_memory}MB"
+    echo "  Disk: ${vm_disk}GB"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
 prompt_agent_configs() {
 # Function to prompt for Wazuh configuration
 prompt_wazuh_config() {
@@ -70,22 +99,6 @@ prompt_newt_config() {
         NEWT_VARS="-e newt_endpoint='$NEWT_ENDPOINT' -e newt_id='$newt_id' -e newt_secret='$newt_secret'"
         echo "✓ Newt configuration will be applied"
     
-    # Prompt for Olm credentials
-    echo ""
-    echo "Olm (Pangolin mesh networking) Configuration:"
-    echo "Endpoint: https://pangolin.ass.restaurant"
-    echo ""
-    read -p "Olm ID: " olm_id
-    read -sp "Olm Secret: " olm_secret
-    echo ""
-    
-    if [[ -z "$olm_id" || -z "$olm_secret" ]]; then
-        echo "⊘ Skipping Olm (ID or Secret not provided)"
-        OLM_VARS=""
-    else
-        OLM_VARS="-e olm_endpoint='$NEWT_ENDPOINT' -e olm_id='$olm_id' -e olm_secret='$olm_secret'"
-        echo "✓ Olm configuration will be applied"
-    fi
     fi
     
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -125,14 +138,14 @@ prompt_agent_configs() {
     prompt_checkmk_config
     
     # Combine all extra vars
-    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $OLM_VARS $CHECKMK_VARS"
+    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $CHECKMK_VARS"
 }
     prompt_wazuh_config
     prompt_newt_config
     prompt_checkmk_config
     
     # Combine all extra vars
-    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $OLM_VARS $CHECKMK_VARS"
+    EXTRA_VARS="$WAZUH_VARS $NEWT_VARS $CHECKMK_VARS"
 }
 
 # Parse command line arguments
@@ -166,31 +179,35 @@ do
     case $REPLY in
         1)
             echo ""
+            prompt_vm_config
+            echo ""
             echo "→ Running: Deploy VMs ${DRY_RUN:+(dry run)}"
-            moulti run ansible-playbook playbooks/deploy_vms.yml $DRY_RUN
+            moulti run ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS
             break
             ;;
         2)
+            echo ""
+            prompt_vm_config
             echo ""
             prompt_agent_configs
             echo ""
             echo "→ Running: Deploy VMs + Configure Agents ${DRY_RUN:+(dry run)}"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             
-            moulti run bash << SCRIPT
-export PATH="$HOME/.local/bin:$PATH"
+            moulti run bash -c "
+export PATH=\"\$HOME/.local/bin:\$PATH\"
 
-moulti step add step1 --title="Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}" --classes="standard"
-ansible-playbook playbooks/deploy_vms.yml $DRY_RUN 2>&1 | moulti pass step1
+moulti step add step1 --title='Step 1/2: Deploy VMs ${DRY_RUN:+(dry run)}' --classes='standard'
+ansible-playbook playbooks/deploy_vms.yml $DRY_RUN $VM_VARS 2>&1 | moulti pass step1
 
-moulti divider add div1 --title "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+moulti divider add div1 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-moulti step add step2 --title="Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}" --classes="standard"
+moulti step add step2 --title='Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}' --classes='standard'
 ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $EXTRA_VARS 2>&1 | moulti pass step2
 
-moulti divider add div2 --title "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-moulti step add complete --title="✓ Complete" --text="VM deployment finished! ${DRY_RUN:+(dry run - no changes made)}" --classes="success"
-SCRIPT
+moulti divider add div2 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+moulti step add complete --title='✓ Complete' --text='="VM deployment finished! ${DRY_RUN:+(dry run - no changes made)}' --classes='="success'
+"
             break
             ;;
         3)

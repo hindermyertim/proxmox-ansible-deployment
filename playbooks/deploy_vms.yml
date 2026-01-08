@@ -2,12 +2,20 @@
 - name: Deploy VMs to Proxmox
   hosts: localhost
   gather_facts: false
-  vars_files:
-    - ../group_vars/all.yml
+  become: false
   vars:
     proxmox_api_host: "{{ lookup('env', 'PROXMOX_HOST') }}"
     proxmox_api_user: "{{ lookup('env', 'PROXMOX_USER') }}"
     proxmox_api_password: "{{ lookup('env', 'PROXMOX_PASSWORD') }}"
+    proxmox_node: "pve"
+    # VM configuration (can be overridden with -e flags)
+    vm_name_input: "{{ vm_name | default('debian-vm-01') }}"
+    vm_id_input: "{{ vm_id | default(101) }}"
+    vm_cores_input: "{{ vm_cores | default(2) }}"
+    vm_memory_input: "{{ vm_memory | default(2048) }}"
+    vm_disk_input: "{{ vm_disk | default(32) }}"
+    vm_iso_input: "{{ vm_iso | default('local:iso/debian-13.1.0-amd64-netinst.iso') }}"
+    vm_storage_input: "{{ vm_storage | default('local-lvm') }}"
     
   tasks:
     - name: Create VM
@@ -16,48 +24,49 @@
         api_user: "{{ proxmox_api_user }}"
         api_password: "{{ proxmox_api_password }}"
         node: "{{ proxmox_node }}"
-        vmid: "{{ item.vmid }}"
-        name: "{{ item.name }}"
-        cores: "{{ item.cores | default(2) }}"
-        memory: "{{ item.memory | default(2048) }}"
+        vmid: "{{ vm_id_input }}"
+        name: "{{ vm_name_input }}"
+        cores: "{{ vm_cores_input }}"
+        memory: "{{ vm_memory_input }}"
         net:
           net0: "virtio,bridge=vmbr0"
         ide:
-          ide2: "{{ item.iso }},media=cdrom"
+          ide2: "{{ vm_iso_input }},media=cdrom"
         scsihw: virtio-scsi-pci
         scsi:
-          scsi0: "{{ item.storage | default('local-lvm') }}:{{ item.disk_size | default(32) }}"
+          scsi0: "{{ vm_storage_input }}:{{ vm_disk_input }}"
         boot: "order=scsi0;ide2"
-        ostype: "{{ item.ostype | default('l26') }}"
+        ostype: l26
         state: present
-      loop: "{{ vms }}"
-      register: vm_results
 
-    - name: Start VMs
+    - name: Start VM
       community.general.proxmox_kvm:
         api_host: "{{ proxmox_api_host }}"
         api_user: "{{ proxmox_api_user }}"
         api_password: "{{ proxmox_api_password }}"
         node: "{{ proxmox_node }}"
-        vmid: "{{ item.vmid }}"
+        vmid: "{{ vm_id_input }}"
         state: started
-      loop: "{{ vms }}"
 
-    - name: Wait for VMs to be accessible
-      ansible.builtin.wait_for:
-        host: "{{ item.ip }}"
-        port: 22
-        timeout: 300
-      loop: "{{ vms }}"
-      when: item.ip is defined
+    - name: Wait for VM to get IP address
+      pause:
+        seconds: 30
 
-    - name: Configure console autologin for VMs
-      ansible.builtin.shell: |
-        ssh root@{{ item.ip }} "mkdir -p /etc/systemd/system/getty@tty1.service.d && cat > /etc/systemd/system/getty@tty1.service.d/override.conf << 'EOFINNER'
-        [Service]
-        ExecStart=
-        ExecStart=-/sbin/agetty --autologin root --noclear %I \$TERM
-        EOFINNER
-        systemctl daemon-reload && systemctl restart getty@tty1"
-      loop: "{{ vms }}"
-      when: item.ip is defined
+    - name: Get VM IP address from Proxmox
+      shell: |
+        ssh root@{{ proxmox_api_host }} "qm guest cmd {{ vm_id_input }} network-get-interfaces | jq -r '.[] | select(.name==\"eth0\" or .name==\"ens18\") | .[\"ip-addresses\"][] | select(.\"ip-address-type\"==\"ipv4\") | .[\"ip-address\"]' | head -1"
+      register: vm_ip
+      ignore_errors: yes
+
+    - name: Update inventory with deployed VM
+      blockinfile:
+        path: "{{ playbook_dir }}/../inventory/hosts.yml"
+        marker: "        # {mark} ANSIBLE MANAGED - VMS"
+        insertafter: "    vms:"
+        block: |
+          {% if vm_ip.stdout is defined and vm_ip.stdout != "" %}
+                  {{ vm_name_input }}:
+                    ansible_host: {{ vm_ip.stdout }}
+                    ansible_user: root
+          {% endif %}
+      when: vm_ip.stdout is defined and vm_ip.stdout != ""

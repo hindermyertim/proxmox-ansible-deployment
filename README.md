@@ -71,9 +71,11 @@ nvim inventory/hosts.yml
 
 ### 3. Add Containers or VMs
 
+#### For LXC Containers
+
 You have two options for adding new containers:
 
-#### Option A: Interactive Helper (Recommended)
+**Option A: Interactive Helper (Recommended)**
 
 Use the helper script to generate container configurations:
 
@@ -86,7 +88,7 @@ This will:
 - Generate the YAML configuration
 - Optionally deploy immediately
 
-#### Option B: Manual Configuration
+**Option B: Manual Configuration**
 
 Edit `group_vars/all.yml` directly and add your container under the `containers:` section:
 
@@ -105,6 +107,22 @@ containers:
     unprivileged: true
     password: "changeme123"
 ```
+
+#### For VMs
+
+**VMs are now configured interactively during deployment!**
+
+When you run `./run-playbook.sh` and select "Deploy VMs" (option 1 or 2), you'll be prompted to enter:
+- VM Name (e.g., debian-vm-02)
+- VM ID (e.g., 102)
+- CPU Cores (default: 2)
+- Memory in MB (default: 2048)
+- Disk size in GB (default: 32)
+
+The VM will be created with these specifications automatically. No need to edit YAML files!
+
+> **Note**: The default Debian ISO used is `debian-13.1.0-amd64-netinst.iso`. Make sure this ISO is uploaded to your Proxmox server under the `local` storage.
+
 ### 4. Configure What to Install
 
 Edit `group_vars/all.yml`:

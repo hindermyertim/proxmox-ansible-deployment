@@ -5,7 +5,6 @@
   vars:
     install_monitoring: true
     install_qemu_agent: true
-    install_olm: true
     install_newt: true
     install_wazuh: true
     install_checkmk: true
@@ -14,10 +13,6 @@
     
     # Newt (Pangolin) configuration
     
-    # Olm (Pangolin mesh) configuration
-    olm_endpoint: "{{ lookup('env', 'NEWT_ENDPOINT') }}"
-    olm_id: ""
-    olm_secret: ""
     newt_server: "{{ lookup('env', 'NEWT_SERVER') }}"
     newt_token: "{{ lookup('env', 'NEWT_TOKEN') }}"
     
@@ -238,7 +233,7 @@
               After=network.target
 
               [Service]
-              ExecStart=/usr/local/bin/newt --id {{ newt_id }} --secret {{ newt_secret }} --endpoint {{ newt_endpoint }} --accept-clients
+              ExecStart=/usr/local/bin/newt --id {{ newt_id }} --secret {{ newt_secret }} --endpoint {{ newt_endpoint }}
               Restart=always
               User=root
 
@@ -251,57 +246,6 @@
             enabled: yes
 
     # ===========================================================================
-    # ===========================================================================
-    # ===========================================================================
-    - name: Install Olm client for Pangolin mesh networking
-      block:
-        - name: Download Olm binary
-          get_url:
-            url: "https://github.com/fosrl/olm/releases/download/1.1.5/olm_linux_amd64"
-            dest: /usr/local/bin/olm
-            mode: '0755'
-          when:
-            - olm_endpoint is defined and olm_endpoint != ""
-            - olm_id is defined and olm_id != ""
-            - olm_secret is defined and olm_secret != ""
-
-        - name: Create Olm systemd service
-          copy:
-            dest: /etc/systemd/system/olm.service
-            mode: '0644'
-            content: |
-              [Unit]
-              Description=Olm VPN Mesh Client
-              After=network-online.target
-              Wants=network-online.target
-
-              [Service]
-              Type=simple
-              ExecStart=/usr/local/bin/olm --id {{ olm_id }} --secret {{ olm_secret }} --endpoint {{ olm_endpoint }}
-              Restart=always
-              RestartSec=10
-              StandardOutput=journal
-              StandardError=journal
-
-              [Install]
-              WantedBy=multi-user.target
-          when:
-            - olm_endpoint is defined and olm_endpoint != ""
-            - olm_id is defined and olm_id != ""
-            - olm_secret is defined and olm_secret != ""
-
-        - name: Enable and start Olm service
-          systemd:
-            name: olm
-            state: started
-            enabled: yes
-            daemon_reload: yes
-          when:
-            - olm_endpoint is defined and olm_endpoint != ""
-            - olm_id is defined and olm_id != ""
-            - olm_secret is defined and olm_secret != ""
-      when: install_olm | bool
-
     # ===========================================================================
     # WAZUH AGENT (Security monitoring)
     # ===========================================================================
