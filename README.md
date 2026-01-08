@@ -1,3 +1,5 @@
+> **⚠️ Work in Progress**: This project is actively being developed and improved. Some features may change.
+
 # Ansible Proxmox Infrastructure
 
 Automated deployment of VMs and LXC containers to Proxmox with comprehensive agent configuration and Dashy dashboard integration.
@@ -12,7 +14,6 @@ Automated deployment of VMs and LXC containers to Proxmox with comprehensive age
   - Node Exporter (Prometheus metrics)
   - Newt (Pangolin reverse proxy client)
   - Wazuh (Security monitoring)
-  - Olm (Pangolin mesh VPN)
   - CheckMK (Infrastructure analytics)
 - 📊 Dashy dashboard integration - automatically add new services
 - 📝 Easy configuration via YAML files
@@ -151,7 +152,6 @@ export PROXMOX_PASSWORD="your-password"
 # Agent configuration (optional)
 export NEWT_SERVER="https://your-pangolin-server.com"
 export NEWT_TOKEN="your-token"
-export NEWT_ACCEPT_CLIENTS=true  # Optional: Enable Olm client support
 
 export WAZUH_MANAGER_IP="your-wazuh-server"
 export CHECKMK_SERVER="your-checkmk-server"
@@ -217,56 +217,7 @@ The playbook can automatically configure monitoring and management agents on dep
 
 1. **Wazuh** - Security monitoring and threat detection
 2. **Pangolin/Newt** - Reverse proxy tunneling for remote access
-4. **Olm** - Pangolin mesh VPN for secure container networking
 3. **CheckMK** - Infrastructure monitoring
-
-#### Olm (Pangolin Mesh VPN)
-
-[Olm](https://github.com/fosrl/olm) is a lightweight VPN mesh client that connects your containers to the Pangolin mesh network. It is useful for:
-- Connecting remote containers to centralized monitoring (Wazuh, CheckMK)
-- Creating secure mesh networks between distributed infrastructure
-- Enabling private communication channels without complex networking
-
-**Requirements:**
-- Olm endpoint URL (uses NEWT_ENDPOINT from environment) and credentials (olm_id and olm_secret)
-- TUN device support in LXC containers (automatically configured)
-- Network connectivity to the Olm endpoint
-
-**Container Configuration:**
-
-To enable Olm on a container, add `enable_olm: true` to the container definition in `group_vars/all.yml`:
-**Note:** You must set `enable_olm: true` **before** deploying the container for TUN device configuration to be applied automatically.
-
-
-```yaml
-containers:
-  - hostname: myserver
-    vmid: 114
-    enable_olm: true  # Enable TUN device and Olm support
-    # ... other settings
-```
-
-The playbook will automatically:
-1. Configure TUN device support in the container
-2. Download and install the Olm binary to `/usr/local/bin/olm`
-3. Create a systemd service for automatic startup
-4. Connect to the specified Olm endpoint
-
-**Verification:**
-
-Check Olm status on a container:
-```bash
-ssh root@<container-ip> "systemctl status olm"
-ssh root@<container-ip> "ip addr show olm"
-ssh root@<container-ip> "journalctl -u olm -n 50"
-```
-
-**Troubleshooting:**
-
-- **TUN device errors:** The container needs TUN device support. This is automatically configured when `enable_olm: true` is set and the container is deployed via `deploy_lxc.yml`.
-- **Connection failures:** Check that the Olm endpoint is reachable and credentials are correct.
-- **Service not starting:** Review logs with `journalctl -u olm -f`
-- **Wazuh registration issues:** Ensure Wazuh manager version matches or is newer than agent version. Upgrade manager with: `apt-get update && apt-get install --only-upgrade wazuh-manager -y`
 
 ### Environment Variables
 
@@ -339,7 +290,6 @@ Set `install_docker: true` in `group_vars/all.yml` to install:
 - **QEMU Guest Agent** - Proxmox VM integration
 - **Node Exporter** - Prometheus metrics (port 9100)
 - **Newt** - Pangolin reverse proxy/tunneling client
-  - Supports `--accept-clients` flag for Olm connections
 - **Wazuh Agent** - Security monitoring
 - **CheckMK Agent** - Infrastructure analytics (port 6556)
 
@@ -422,10 +372,8 @@ install_wazuh: false        # Skip Wazuh
 install_checkmk: false      # Skip CheckMK
 ```
 
-### Newt with Olm Client Support
 
 ```bash
-export NEWT_ACCEPT_CLIENTS=true
 ```
 
 ## Troubleshooting
