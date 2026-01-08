@@ -48,25 +48,3 @@
         vmid: "{{ vm_id_input }}"
         state: started
 
-    - name: Wait for VM to get IP address
-      pause:
-        seconds: 30
-
-    - name: Get VM IP address from Proxmox
-      shell: |
-        ssh root@{{ proxmox_api_host }} "qm guest cmd {{ vm_id_input }} network-get-interfaces | jq -r '.[] | select(.name==\"eth0\" or .name==\"ens18\") | .[\"ip-addresses\"][] | select(.\"ip-address-type\"==\"ipv4\") | .[\"ip-address\"]' | head -1"
-      register: vm_ip
-      ignore_errors: yes
-
-    - name: Update inventory with deployed VM
-      blockinfile:
-        path: "{{ playbook_dir }}/../inventory/hosts.yml"
-        marker: "        # {mark} ANSIBLE MANAGED - VMS"
-        insertafter: "    vms:"
-        block: |
-          {% if vm_ip.stdout is defined and vm_ip.stdout != "" %}
-                  {{ vm_name_input }}:
-                    ansible_host: {{ vm_ip.stdout }}
-                    ansible_user: root
-          {% endif %}
-      when: vm_ip.stdout is defined and vm_ip.stdout != ""

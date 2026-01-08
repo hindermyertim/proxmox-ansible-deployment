@@ -113,7 +113,7 @@ containers:
 
 **VMs are now configured interactively during deployment!**
 
-When you run `./run-playbook.sh` and select "Deploy VMs" (option 1 or 2), you'll be prompted to enter:
+When you run `./run-playbook.sh` and select "Deploy VMs" (option 1), you'll be prompted to enter:
 - VM Name (e.g., debian-vm-02)
 - VM ID (e.g., 102)
 - CPU Cores (default: 2)
@@ -123,6 +123,12 @@ When you run `./run-playbook.sh` and select "Deploy VMs" (option 1 or 2), you'll
 The VM will be created with these specifications automatically. No need to edit YAML files!
 
 > **Note**: The default Debian ISO used is `debian-13.1.0-amd64-netinst.iso`. Make sure this ISO is uploaded to your Proxmox server under the `local` storage.
+
+**Post-Deployment Steps:**
+1. The VM will be created and started with the ISO mounted
+2. Access the VM console through Proxmox UI to install the operating system
+3. After OS installation, manually add the VM to `inventory/hosts.yml` under the `vms` section
+4. Run option 4 (Configure Agents) from the menu to install monitoring agents
 
 ### 4. Configure What to Install
 
