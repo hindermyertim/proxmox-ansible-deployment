@@ -235,17 +235,6 @@ do
             break
             ;;
         
-
-moulti divider add div1 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-
-moulti step add step2 --title='Step 2/2: Configure Agents ${DRY_RUN:+(dry run)}' --classes='standard'
-ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $EXTRA_VARS 2>&1 | moulti pass step2
-
-moulti divider add div2 --title '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-moulti step add complete --title='✓ Complete' --text='LXC deployment finished! ${DRY_RUN:+(dry run - no changes made)}' --classes='success'
-"
-            break
-            ;;
         5)
             echo ""
             prompt_agent_configs
