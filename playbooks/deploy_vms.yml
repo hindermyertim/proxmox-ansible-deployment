@@ -14,6 +14,9 @@
     vm_memory_input: "{{ vm_memory | default(2048) }}"
     vm_disk_input: "{{ vm_disk | default(32) }}"
     vm_storage_input: "{{ vm_storage | default('local-lvm') }}"
+    vm_ip_input: "{{ vm_ip | default('' ) }}"
+    vm_gateway_input: "{{ vm_gateway | default('192.168.1.1') if vm_gateway else '192.168.1.1' }}"
+    vm_netmask_input: "{{ vm_netmask | default('24') }}"
     cloud_image: "debian-12-genericcloud-amd64.qcow2"
     
   
@@ -51,7 +54,6 @@
             - systemctl enable qemu-guest-agent
             - systemctl start qemu-guest-agent
         dest: "/tmp/vm-{{ vm_id_input }}-userdata.yml"
-    
     - name: Copy files to Proxmox host
       shell: |
         scp /tmp/vm-{{ vm_id_input }}-userdata.yml root@{{ proxmox_api_host }}:/var/lib/vz/snippets/vm-{{ vm_id_input }}-userdata.yml
@@ -69,15 +71,6 @@
           --agent enabled=1 >/dev/null
         "
     
-    - name: Prompt for VM storage
-      pause:
-        prompt: "Enter storage name for VM disk (e.g., local-lvm)"
-      register: vm_storage_prompt
-    
-    - name: Set storage fact
-      set_fact:
-        vm_storage_input: "{{ vm_storage_prompt.user_input }}"
-    
     - name: Import cloud image and configure cloud-init
       shell: |
         ssh root@{{ proxmox_api_host }} "
@@ -92,7 +85,7 @@
         qm set {{ vm_id_input }} \
           -ciuser root \
           -cicustom 'user=local:snippets/vm-{{ vm_id_input }}-userdata.yml' \
-          -ipconfig0 ip=dhcp >/dev/null
+          -ipconfig0 {% if vm_ip_input | default('' ) | length > 0 %}ip={{ vm_ip_input }}/{{ vm_netmask_input }},gw={{ vm_gateway_input }}{% else %}ip=dhcp{% endif %} >/dev/null
         
         "
     
@@ -104,39 +97,74 @@
       pause:
         seconds: 120
     
-    - name: Wait for VM to get IP via guest agent
-      shell: |
-        ssh root@{{ proxmox_api_host }} "qm guest cmd {{ vm_id_input }} network-get-interfaces" 2>/dev/null || echo "not ready"
-      register: vm_network
-      until: vm_network.stdout | from_json | json_query('[?name==`eth0`].["ip-addresses"][0][0].["ip-address"]') | length > 0
-      retries: 20
-      delay: 15
-      ignore_errors: yes
     
-    - name: Extract VM IP address
-      set_fact:
-        vm_ip: "{{ vm_network.stdout | from_json | json_query('[?name==`eth0`].\"ip-addresses\"[0][0].\"ip-address\"') | first }}"
-      when: vm_network is succeeded
     
-    - name: Display VM IP
-      debug:
-        msg: "VM {{ vm_name_input }} (ID: {{ vm_id_input }}) is ready with IP: {{ vm_ip }}"
-      when: vm_network is succeeded
-    
-    - name: Fail if VM didn't get IP
-      fail:
-        msg: "VM failed to get IP address via guest agent"
-      when: vm_network is failed
-    
-    - name: Update inventory with new VM
-      lineinfile:
-        path: ../inventory/hosts.ini
-        line: "{{ vm_name_input }} ansible_host={{ vm_ip }} ansible_user=root"
-        insertafter: '^\[vms\]'
-        state: present
-      when: vm_network is succeeded
     
     - name: Display success message
       debug:
         msg: "VM {{ vm_name_input }} deployed successfully and added to inventory!"
-      when: vm_network is succeeded
+      when: vm_ip is defined
+    - name: Update inventory with new VM
+      shell: |
+        python3 << 'PYTHON_EOF'
+        import yaml
+        
+        vm_name = "{{ vm_name_input }}"
+        vm_ip = "{{ vm_ip }}"
+        inventory_path = "../inventory/hosts.yml"
+        
+        with open(inventory_path, 'r') as f:
+            inventory = yaml.safe_load(f)
+        
+        # Ensure vms.hosts exists and is a dict
+        if 'hosts' not in inventory['all']['children']['vms'] or inventory['all']['children']['vms']['hosts'] is None:
+            inventory['all']['children']['vms']['hosts'] = {}
+        
+        # Add or update the VM
+        inventory['all']['children']['vms']['hosts'][vm_name] = {
+            'ansible_host': vm_ip,
+            'ansible_user': 'root'
+        }
+        
+        with open(inventory_path, 'w') as f:
+            yaml.dump(inventory, f, default_flow_style=False, sort_keys=False)
+        
+        print(f"Added {vm_name} to inventory")
+        PYTHON_EOF
+      when: vm_ip is defined
+    - name: Use static IP if provided
+      set_fact:
+        vm_ip: "{{ vm_ip_input }}"
+      when: vm_ip_input | default('') | length > 0
+    
+    - name: Wait for VM to get IP via guest agent (DHCP mode)
+      shell: |
+        ssh root@{{ proxmox_api_host }} "qm guest cmd {{ vm_id_input }} network-get-interfaces" 2>/dev/null || echo "not ready"
+      register: vm_network
+      until: vm_network.stdout | from_json | selectattr('name', 'equalto', 'eth0') | map(attribute='ip-addresses') | map('first') | map(attribute='ip-address') | list | length > 0
+      retries: 20
+      delay: 15
+      ignore_errors: yes
+      when: vm_ip_input | default('') | length == 0
+    
+    - name: Extract VM IP address from guest agent (DHCP mode)
+      set_fact:
+        vm_ip: "{{ (vm_network.stdout | from_json | selectattr('name', 'equalto', 'eth0') | list | first)['ip-addresses'][0]['ip-address'] }}"
+      when: vm_ip_input | default('') | length == 0 and vm_network is succeeded
+    
+    - name: Display VM IP
+      debug:
+        msg: "VM {{ vm_name_input }} (ID: {{ vm_id_input }}) is ready with IP: {{ vm_ip }}"
+      when: vm_ip is defined
+    
+    - name: Verify SSH connectivity to VM
+      wait_for:
+        host: "{{ vm_ip }}"
+        port: 22
+        timeout: 120
+      when: vm_ip is defined
+    
+    - name: Fail if VM didn't get IP
+      fail:
+        msg: "VM failed to get IP address"
+      when: vm_ip is not defined

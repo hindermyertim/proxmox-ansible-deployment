@@ -25,8 +25,10 @@ prompt_vm_config() {
     vm_memory=${vm_memory:-2048}
     read -p "Disk size in GB (default: 32): " vm_disk
     vm_disk=${vm_disk:-32}
+    read -p "Static IP address (e.g., 192.168.1.50, or press Enter for DHCP): " vm_ip
+    read -p "Gateway (default: 192.168.1.1): " vm_gateway
     
-    VM_VARS="-e vm_name=$vm_name -e vm_id=$vm_id -e vm_cores=$vm_cores -e vm_memory=$vm_memory -e vm_disk=$vm_disk"
+    VM_VARS="-e vm_name=$vm_name -e vm_id=$vm_id -e vm_cores=$vm_cores -e vm_memory=$vm_memory -e vm_disk=$vm_disk -e vm_ip=$vm_ip -e vm_gateway=$vm_gateway"
     
     echo ""
     echo "✓ VM Configuration:"
@@ -207,6 +209,10 @@ do
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "Step 2/2: Configuring Agents..."
+            if [[ -z "$vm_ip" ]]; then
+                echo "Refreshing VM IPs from guest agent..."
+                moulti run ansible-playbook playbooks/refresh_vm_ips.yml
+            fi
             moulti run ansible-playbook -i inventory/hosts.yml playbooks/configure_agents.yml $DRY_RUN $EXTRA_VARS
             
             echo ""

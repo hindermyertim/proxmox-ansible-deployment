@@ -119,6 +119,14 @@ VMs are deployed using Debian 12 cloud images with automatic SSH key injection a
 - CPU Cores (default: 2)
 - Memory in MB (default: 2048)
 - Disk size in GB (default: 32)
+- Storage name (default: local-lvm)
+- Static IP address (optional, press Enter for DHCP)
+- Gateway (default: 192.168.1.1, only needed for static IP)
+
+
+**Network Configuration:**
+- **Static IP (recommended)**: Enter an IP address like `192.168.1.50` to avoid DHCP lease changes
+- **DHCP**: Press Enter at the IP prompt to use automatic IP assignment
 
 The playbook will automatically:
 1. ✅ Create the VM with the specified resources
@@ -126,7 +134,7 @@ The playbook will automatically:
 3. ✅ Inject SSH keys from both this control node AND the Proxmox host
 4. ✅ Install qemu-guest-agent via cloud-init for IP detection
 5. ✅ Start the VM and wait for it to boot
-6. ✅ Detect the VM's IP address automatically
+6. ✅ Configure static IP or detect via guest agent (DHCP mode)
 7. ✅ Test SSH connectivity
 8. ✅ Add the VM to inventory automatically
 

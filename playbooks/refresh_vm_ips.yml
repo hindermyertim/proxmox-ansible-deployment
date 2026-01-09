@@ -1,0 +1,65 @@
+---
+- name: Refresh VM IPs from Proxmox
+  hosts: localhost
+  gather_facts: no
+  become: false
+  vars:
+    proxmox_api_host: "{{ lookup('env', 'PROXMOX_HOST') }}"
+  tasks:
+    - name: Get all VMs from inventory
+      set_fact:
+        vm_list: "{{ groups['vms'] | default([]) }}"
+    
+    - name: Get list of VMs from Proxmox
+      shell: |
+        ssh root@{{ proxmox_api_host }} "qm list" | awk 'NR>1 {print $1, $2}'
+      register: proxmox_vms
+      when: vm_list | length > 0
+    
+    - name: Refresh each VM IP from guest agent
+      shell: |
+        vm_name="{{ item }}"
+        # Find VM ID by matching name (case-insensitive, partial match)
+        vm_id=$(echo "{{ proxmox_vms.stdout }}" | grep -i "${vm_name}" | awk '{print $1}' | head -1)
+        
+        if [ -n "$vm_id" ]; then
+          ssh root@{{ proxmox_api_host }} "qm guest cmd $vm_id network-get-interfaces" 2>/dev/null | \
+            python3 -c "import sys, json; data = json.load(sys.stdin); eth0 = [i for i in data if i['name'] == 'eth0']; print('${vm_name}:' + eth0[0]['ip-addresses'][0]['ip-address']) if eth0 and eth0[0].get('ip-addresses') else ''"
+        fi
+      register: vm_ip_results
+      loop: "{{ vm_list }}"
+      when: vm_list | length > 0
+    
+    - name: Update inventory with refreshed IPs
+      shell: |
+        python3 << 'PYTHON_EOF'
+        import yaml
+        
+        inventory_path = "../inventory/hosts.yml"
+        
+        # Parse the VM name:IP pairs from the results
+        results = {{ vm_ip_results.results | map(attribute='stdout') | list | to_json }}
+        
+        vm_updates = {}
+        for result in results:
+            if result and ':' in result:
+                vm_name, ip = result.split(':', 1)
+                vm_updates[vm_name] = ip
+        
+        if not vm_updates:
+            print("No VMs to update")
+            exit(0)
+        
+        with open(inventory_path, 'r') as f:
+            inventory = yaml.safe_load(f)
+        
+        for vm_name, ip in vm_updates.items():
+            if vm_name in inventory['all']['children']['vms']['hosts']:
+                old_ip = inventory['all']['children']['vms']['hosts'][vm_name].get('ansible_host', 'unknown')
+                inventory['all']['children']['vms']['hosts'][vm_name]['ansible_host'] = ip
+                print(f"Updated {vm_name}: {old_ip} -> {ip}")
+        
+        with open(inventory_path, 'w') as f:
+            yaml.dump(inventory, f, default_flow_style=False, sort_keys=False)
+        PYTHON_EOF
+      when: vm_list | length > 0
